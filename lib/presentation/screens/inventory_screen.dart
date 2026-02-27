@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
@@ -36,10 +37,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 fillColor: Colors.white,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
               ),
-              onChanged: (value) {
-                // Filtra en tiempo real (HU12)
-                ref.read(productsProvider.notifier).loadProducts(query: value);
-              },
+              onChanged: (value) => ref.read(productsProvider.notifier).loadProducts(query: value),
             ),
           ),
         ),
@@ -64,8 +62,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     children: [
                       Text(currency.format(product.precio), style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 16)),
                       IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.blue),
+                        onPressed: () => _showProductModal(context, productoAEditar: product),
+                      ),
+                      IconButton(
                         icon: const Icon(Icons.delete_outline, color: Colors.red),
-                        onPressed: () => _confirmDelete(context, ref, product),
+                        onPressed: () => _confirmDelete(context, product),
                       )
                     ],
                   ),
@@ -76,64 +78,60 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddProductModal(context, ref),
+        onPressed: () => _showProductModal(context),
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  // --- MODAL PARA AGREGAR PRODUCTO ---
-  void _showAddProductModal(BuildContext context, WidgetRef ref) {
+  // --- MODAL ÚNICO PARA AGREGAR O EDITAR ---
+  void _showProductModal(BuildContext context, {Product? productoAEditar}) {
     final formKey = GlobalKey<FormState>();
-    String nombre = '';
-    String categoria = '';
-    double precio = 0;
-    int stock = 0;
+    final esEdicion = productoAEditar != null;
+
+    String nombre = productoAEditar?.nombre ?? '';
+    String categoria = productoAEditar?.categoria ?? '';
+    double precio = productoAEditar?.precio ?? 0;
+    int stock = productoAEditar?.stock ?? 0;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          left: 16, right: 16, top: 16,
-        ),
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 16, right: 16, top: 16),
         child: Form(
           key: formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Nuevo Producto', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              Text(esEdicion ? 'Editar Producto' : 'Nuevo Producto', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 15),
-
-              // 1. CAMPO: NOMBRE DEL PRODUCTO (¡Aquí está de vuelta!)
               TextFormField(
+                initialValue: nombre,
                 decoration: const InputDecoration(labelText: 'Nombre del producto', border: OutlineInputBorder()),
-                validator: (val) => val == null || val.isEmpty ? 'Debe ingresar el nombre' : null,
+                validator: (val) => val == null || val.trim().isEmpty ? 'Debe ingresar el nombre' : null,
                 onSaved: (val) => nombre = val!,
               ),
               const SizedBox(height: 10),
-
-              // 2. CAMPO: CATEGORÍA (Menú desplegable)
               DropdownButtonFormField<String>(
+                initialValue: categoria.isNotEmpty ? categoria : null,
                 decoration: const InputDecoration(labelText: 'Categoría', border: OutlineInputBorder()),
                 hint: const Text('Seleccione una categoría'),
                 items: ['Papelería', 'Tintas', 'Aseo', 'Dulcería', 'Útiles de Oficina', 'Otros']
-                    .map((cat) => DropdownMenuItem(value: cat, child: Text(cat)))
-                    .toList(),
+                    .map((cat) => DropdownMenuItem(value: cat, child: Text(cat))).toList(),
                 validator: (val) => val == null || val.isEmpty ? 'Debe seleccionar una categoría' : null,
                 onChanged: (val) { if (val != null) categoria = val; },
                 onSaved: (val) { if (val != null) categoria = val; },
               ),
               const SizedBox(height: 10),
-
-              // 3. CAMPOS: PRECIO Y STOCK (En una sola fila para ahorrar espacio)
               Row(
                 children: [
                   Expanded(
                     child: TextFormField(
+                      initialValue: esEdicion ? precio.toStringAsFixed(0) : '',
                       decoration: const InputDecoration(labelText: 'Precio (\$)', border: OutlineInputBorder()),
                       keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       validator: (val) => val == null || val.isEmpty ? 'Falta precio' : null,
                       onSaved: (val) => precio = double.parse(val!),
                     ),
@@ -141,8 +139,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: TextFormField(
+                      initialValue: esEdicion ? stock.toString() : '',
                       decoration: const InputDecoration(labelText: 'Stock Inicial', border: OutlineInputBorder()),
                       keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       validator: (val) => val == null || val.isEmpty ? 'Falta stock' : null,
                       onSaved: (val) => stock = int.parse(val!),
                     ),
@@ -150,32 +150,32 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 ],
               ),
               const SizedBox(height: 20),
-
-              // BOTÓN GUARDAR
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white),
-                  child: const Padding(padding: EdgeInsets.all(12.0), child: Text('Guardar Producto', style: TextStyle(fontSize: 16))),
+                  child: Padding(padding: const EdgeInsets.all(12.0), child: Text(esEdicion ? 'Actualizar Cambios' : 'Guardar Producto', style: const TextStyle(fontSize: 16))),
                   onPressed: () async {
                     if (formKey.currentState!.validate()) {
                       formKey.currentState!.save();
 
                       final newProduct = Product(
-                        id: const Uuid().v4(),
+                        id: esEdicion ? productoAEditar.id : const Uuid().v4(),
                         nombre: nombre.trim(),
                         categoria: categoria,
                         precio: precio,
                         stock: stock,
                       );
 
-                      final error = await ref.read(productsProvider.notifier).addProduct(newProduct);
+                      final error = esEdicion
+                          ? await ref.read(productsProvider.notifier).editProduct(newProduct)
+                          : await ref.read(productsProvider.notifier).addProduct(newProduct);
 
                       if (error != null && ctx.mounted) {
                         ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
                       } else if (ctx.mounted) {
                         Navigator.pop(ctx);
-                        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Producto guardado'), backgroundColor: Colors.green));
+                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(esEdicion ? 'Producto actualizado' : 'Producto guardado'), backgroundColor: Colors.green));
                       }
                     }
                   },
@@ -189,8 +189,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     );
   }
 
-  // --- DIÁLOGO DE CONFIRMACIÓN DE BORRADO ---
-  void _confirmDelete(BuildContext context, WidgetRef ref, Product product) {
+  void _confirmDelete(BuildContext context, Product product) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -203,7 +202,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               Navigator.pop(ctx);
               final error = await ref.read(productsProvider.notifier).deleteProduct(product.id);
               if (error != null && context.mounted) {
-                // HU11 Escenario 4: Bloquear eliminación y mostrar mensaje
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.orange));
               }
             },

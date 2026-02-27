@@ -82,7 +82,7 @@ class SettingsScreen extends ConsumerWidget {
           const ListTile(
             leading: Icon(Icons.info_outline),
             title: Text('Versión de InkTrack'),
-            subtitle: Text('1.0.0 - Modo Offline Activo'),
+            subtitle: Text('1.1.0 - Modo Offline Activo'),
           )
         ],
       ),

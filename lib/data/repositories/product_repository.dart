@@ -5,7 +5,7 @@ import '../datasources/database_helper.dart';
 class ProductRepository {
   final dbHelper = DatabaseHelper.instance;
 
-  // Listar productos (con filtro de búsqueda opcional - HU12)
+  // 1. Listar productos (con filtro de búsqueda)
   Future<List<Product>> getProducts({String? query}) async {
     final db = await dbHelper.database;
     List<Map<String, dynamic>> maps;
@@ -24,11 +24,10 @@ class ProductRepository {
     return List.generate(maps.length, (i) => Product.fromMap(maps[i]));
   }
 
-  // Agregar producto (HU11 - Validar duplicados)
+  // 2. Agregar producto (Valida duplicados)
   Future<void> addProduct(Product product) async {
     final db = await dbHelper.database;
 
-    // Verificar si ya existe un producto con el mismo nombre exacto
     final result = await db.query(
       'productos',
       where: 'LOWER(nombre) = ?',
@@ -36,23 +35,33 @@ class ProductRepository {
     );
 
     if (result.isNotEmpty) {
-      throw Exception('DUPLICADO'); // Dispara la advertencia de la HU11 Escenario 3
+      throw Exception('DUPLICADO');
     }
 
     await db.insert('productos', product.toMap());
   }
 
-  // Eliminar producto (HU11 - Validar uso previo)
+  // 3. Eliminar producto (Valida que no esté en uso)
   Future<void> deleteProduct(String id) async {
     final db = await dbHelper.database;
     try {
       await db.delete('productos', where: 'id = ?', whereArgs: [id]);
     } on DatabaseException catch (e) {
-      // Como en el Sprint 1 pusimos 'ON DELETE RESTRICT', SQLite lanzará un error si está en uso.
-      if (e.toString().contains('FOREIGN KEY constraint failed')) {
-        throw Exception('EN_USO'); // Dispara advertencia HU11 Escenario 4
+      if (e.toString().contains('FOREIGN KEY')) {
+        throw Exception('EN_USO');
       }
       rethrow;
     }
+  }
+
+  // 4. Editar/Actualizar producto (La función nueva de la Versión 2.0)
+  Future<void> updateProduct(Product product) async {
+    final db = await dbHelper.database;
+    await db.update(
+        'productos',
+        product.toMap(),
+        where: 'id = ?',
+        whereArgs: [product.id]
+    );
   }
 }

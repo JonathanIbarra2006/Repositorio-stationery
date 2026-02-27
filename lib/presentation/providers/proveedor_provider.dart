@@ -25,6 +25,16 @@ class ProveedorNotifier extends StateNotifier<AsyncValue<List<Proveedor>>> {
     await _repository.addProveedor(proveedor);
     loadProveedores();
   }
+
+  Future<void> updateProveedor(Proveedor proveedor) async {
+    await _repository.updateProveedor(proveedor);
+    loadProveedores();
+  }
+
+  Future<void> deleteProveedor(String id) async {
+    await _repository.deleteProveedor(id);
+    loadProveedores();
+  }
 }
 
 final proveedoresProvider = StateNotifierProvider<ProveedorNotifier, AsyncValue<List<Proveedor>>>((ref) {

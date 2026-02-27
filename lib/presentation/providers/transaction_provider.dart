@@ -20,20 +20,28 @@ class TransactionNotifier extends StateNotifier<AsyncValue<TransactionState>> {
     loadTransactions();
   }
 
-  Future<void> loadTransactions() async {
+  Future<void> loadTransactions({DateTime? startDate, DateTime? endDate}) async {
     state = const AsyncValue.loading();
     try {
-      final transactions = await _repository.getTransactions();
+      // 1. Pedimos a la BD las transacciones filtradas
+      final transacciones = await _repository.getTransactions(startDate: startDate, endDate: endDate);
 
-      // Cálculo automático de totales
+      // 2. Recalculamos el balance SOLO de esas fechas
       double ingresos = 0;
       double gastos = 0;
-      for (var t in transactions) {
+
+      for (var t in transacciones) {
         if (t.tipo == TransactionType.ingreso) ingresos += t.monto;
         if (t.tipo == TransactionType.gasto) gastos += t.monto;
       }
 
-      state = AsyncValue.data(TransactionState(transactions, ingresos, gastos, ingresos - gastos));
+      // 3. Actualizamos la pantalla
+      state = AsyncValue.data(TransactionState(
+        transacciones,
+        ingresos,
+        gastos,
+        ingresos - gastos,
+      ));
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }
