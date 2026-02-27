@@ -159,36 +159,40 @@ class _NuevoFiadoScreenState extends ConsumerState<NuevoFiadoScreen> {
 
     showDialog(
       context: context,
-      barrierDismissible: false, // Obliga a tocar un botón para salir
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: const Text('Nuevo Cliente'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Validación de Nombre (Solo letras y espacios, obligatorio)
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Nombre Completo'),
-                textCapitalization: TextCapitalization.words,
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\\s]'))],
-                validator: (val) => val == null || val.trim().isEmpty ? 'El nombre es obligatorio' : null,
-                onSaved: (val) => nombre = val!,
-              ),
-              const SizedBox(height: 10),
-              // Validación de Teléfono (Solo números, obligatorio, longitud mínima)
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Teléfono (Obligatorio)', prefixText: '+57 '),
-                keyboardType: TextInputType.phone,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly], // ¡Bloquea letras!
-                validator: (val) {
-                  if (val == null || val.isEmpty) return 'El teléfono es obligatorio';
-                  if (val.length < 7) return 'Ingrese un teléfono válido (Mín. 7 dígitos)';
-                  return null;
-                },
-                onSaved: (val) => telefono = val!,
-              ),
-            ],
+        // SOLUCIÓN: Agregamos el Scroll aquí también por si el celular es pequeño
+        content: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ... (Los campos de Nombre y Teléfono siguen igual)
+                // Validación de Nombre (Solo letras y espacios, obligatorio)
+                TextFormField(
+                  decoration: const InputDecoration(labelText: 'Nombre Completo'),
+                  textCapitalization: TextCapitalization.words,
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\\s]'))],
+                  validator: (val) => val == null || val.trim().isEmpty ? 'El nombre es obligatorio' : null,
+                  onSaved: (val) => nombre = val!,
+                ),
+                const SizedBox(height: 10),
+                // Validación de Teléfono (Solo números, obligatorio, longitud mínima)
+                TextFormField(
+                  decoration: const InputDecoration(labelText: 'Teléfono (Obligatorio)', prefixText: '+57 '),
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly], // ¡Bloquea letras!
+                  validator: (val) {
+                    if (val == null || val.isEmpty) return 'El teléfono es obligatorio';
+                    if (val.length < 7) return 'Ingrese un teléfono válido (Mín. 7 dígitos)';
+                    return null;
+                  },
+                  onSaved: (val) => telefono = val!,
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
