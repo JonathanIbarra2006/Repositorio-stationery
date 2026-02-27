@@ -81,56 +81,54 @@ class ProveedoresScreen extends ConsumerWidget {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: Text(esEdicion ? 'Editar Proveedor' : 'Nuevo Proveedor'),
-        // AQUÍ ESTÁ LA SOLUCIÓN HORIZONTAL: Scroll + Padding dinámico para el teclado
-        content: Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-          child: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    initialValue: empresa,
-                    decoration: const InputDecoration(labelText: 'Nombre de la Empresa'),
-                    textCapitalization: TextCapitalization.words,
-                    validator: (val) => val == null || val.trim().isEmpty ? 'Obligatorio' : null,
-                    onSaved: (val) => empresa = val!,
-                  ),
-                  TextFormField(
-                    initialValue: nombre,
-                    decoration: const InputDecoration(labelText: 'Nombre del Contacto'),
-                    textCapitalization: TextCapitalization.words,
-                    validator: (val) => val == null || val.trim().isEmpty ? 'Obligatorio' : null,
-                    onSaved: (val) => nombre = val!,
-                  ),
-                  TextFormField(
-                    initialValue: telefono,
-                    decoration: const InputDecoration(labelText: 'Teléfono (Obligatorio)'),
-                    keyboardType: TextInputType.phone,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    validator: (val) => val == null || val.length < 7 ? 'Teléfono inválido' : null,
-                    onSaved: (val) => telefono = val!,
-                  ),
-                  TextFormField(
-                    initialValue: correo,
-                    decoration: const InputDecoration(labelText: 'Correo (Opcional)'),
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (val) {
-                      if (val != null && val.isNotEmpty) {
-                        final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-                        if (!emailRegex.hasMatch(val)) return 'Correo inválido';
-                      }
-                      return null;
-                    },
-                    onSaved: (val) => correo = val ?? '',
-                  ),
-                ],
-              ),
+        // SOLUCIÓN: Quitamos el Padding y dejamos solo el Scroll
+        content: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  initialValue: empresa,
+                  decoration: const InputDecoration(labelText: 'Nombre de la Empresa'),
+                  textCapitalization: TextCapitalization.words,
+                  validator: (val) => val == null || val.trim().isEmpty ? 'Obligatorio' : null,
+                  onSaved: (val) => empresa = val!,
+                ),
+                TextFormField(
+                  initialValue: nombre,
+                  decoration: const InputDecoration(labelText: 'Nombre del Contacto'),
+                  textCapitalization: TextCapitalization.words,
+                  validator: (val) => val == null || val.trim().isEmpty ? 'Obligatorio' : null,
+                  onSaved: (val) => nombre = val!,
+                ),
+                TextFormField(
+                  initialValue: telefono,
+                  decoration: const InputDecoration(labelText: 'Teléfono (Obligatorio)'),
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (val) => val == null || val.length < 7 ? 'Teléfono inválido' : null,
+                  onSaved: (val) => telefono = val!,
+                ),
+                TextFormField(
+                  initialValue: correo,
+                  decoration: const InputDecoration(labelText: 'Correo (Opcional)'),
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (val) {
+                    if (val != null && val.isNotEmpty) {
+                      final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                      if (!emailRegex.hasMatch(val)) return 'Correo inválido';
+                    }
+                    return null;
+                  },
+                  onSaved: (val) => correo = val ?? '',
+                ),
+              ],
             ),
           ),
         ),
         actions: [
+          // ... (Tus botones de Cancelar y Guardar siguen igual de aquí hacia abajo)
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
           ElevatedButton(
             onPressed: () async {
