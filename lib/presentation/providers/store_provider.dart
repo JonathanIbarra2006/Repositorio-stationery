@@ -28,11 +28,18 @@ class CartNotifier extends StateNotifier<List<CartItem>> {
   CartNotifier() : super([]);
 
   void addToCart(Product product) {
+    // Disminuir stock del producto
+    product.stock--;
+
     // Si ya existe, sumamos 1
     final index = state.indexWhere((item) => item.product.id == product.id);
     if (index != -1) {
-      state[index].quantity++;
-      state = [...state]; // Actualizar estado
+      final existingItem = state[index];
+      state = [
+        ...state.sublist(0, index),
+        CartItem(product: existingItem.product, quantity: existingItem.quantity + 1),
+        ...state.sublist(index + 1),
+      ];
     } else {
       // Si no existe, lo agregamos
       state = [...state, CartItem(product: product)];

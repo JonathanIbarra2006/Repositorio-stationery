@@ -6,6 +6,7 @@ import '../../domain/models/product.dart';
 import '../providers/product_provider.dart';
 import '../providers/cliente_provider.dart';
 import '../providers/fiado_provider.dart';
+import 'package:flutter/services.dart'; // Necesario para restringir el teclado a solo números
 
 class NuevoFiadoScreen extends ConsumerStatefulWidget {
   const NuevoFiadoScreen({super.key});
@@ -46,7 +47,7 @@ class _NuevoFiadoScreenState extends ConsumerState<NuevoFiadoScreen> {
                   child: clientesAsync.when(
                     data: (clientes) => DropdownButtonFormField<Cliente>(
                       decoration: const InputDecoration(labelText: 'Seleccionar Cliente', border: OutlineInputBorder()),
-                      value: _clienteSeleccionado,
+                      initialValue: _clienteSeleccionado,
                       items: clientes.map((c) => DropdownMenuItem(value: c, child: Text(c.nombre))).toList(),
                       onChanged: (val) => setState(() => _clienteSeleccionado = val),
                     ),
@@ -152,28 +153,54 @@ class _NuevoFiadoScreenState extends ConsumerState<NuevoFiadoScreen> {
 
   // Dialog para crear cliente rápido (HU03 - Escenario 2)
   void _mostrarDialogoNuevoCliente(BuildContext context, WidgetRef ref) {
+    final formKey = GlobalKey<FormState>(); // Agregamos un FormKey para validar
     String nombre = '';
     String telefono = '';
+
     showDialog(
       context: context,
+      barrierDismissible: false, // Obliga a tocar un botón para salir
       builder: (ctx) => AlertDialog(
         title: const Text('Nuevo Cliente'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(decoration: const InputDecoration(labelText: 'Nombre'), onChanged: (val) => nombre = val),
-            TextField(decoration: const InputDecoration(labelText: 'Teléfono (Opcional)'), onChanged: (val) => telefono = val),
-          ],
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Validación de Nombre (Solo letras y espacios, obligatorio)
+              TextFormField(
+                decoration: const InputDecoration(labelText: 'Nombre Completo'),
+                textCapitalization: TextCapitalization.words,
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\\s]'))],
+                validator: (val) => val == null || val.trim().isEmpty ? 'El nombre es obligatorio' : null,
+                onSaved: (val) => nombre = val!,
+              ),
+              const SizedBox(height: 10),
+              // Validación de Teléfono (Solo números, obligatorio, longitud mínima)
+              TextFormField(
+                decoration: const InputDecoration(labelText: 'Teléfono (Obligatorio)', prefixText: '+57 '),
+                keyboardType: TextInputType.phone,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly], // ¡Bloquea letras!
+                validator: (val) {
+                  if (val == null || val.isEmpty) return 'El teléfono es obligatorio';
+                  if (val.length < 7) return 'Ingrese un teléfono válido (Mín. 7 dígitos)';
+                  return null;
+                },
+                onSaved: (val) => telefono = val!,
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
           ElevatedButton(
             onPressed: () async {
-              if (nombre.trim().isNotEmpty) {
-                final nuevo = await ref.read(fiadoRepoProvider).crearCliente(nombre, telefono);
-                ref.invalidate(clientesProvider); // Actualizar dropdown
+              if (formKey.currentState!.validate()) {
+                formKey.currentState!.save();
+                final nuevo = await ref.read(fiadoRepoProvider).crearCliente(nombre.trim(), telefono);
+                ref.invalidate(clientesProvider);
                 if (ctx.mounted) {
-                  setState(() => _clienteSeleccionado = nuevo); // Seleccionarlo automáticamente
+                  setState(() => _clienteSeleccionado = nuevo);
                   Navigator.pop(ctx);
                 }
               }

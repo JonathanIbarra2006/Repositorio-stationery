@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../domain/models/proveedor.dart';
@@ -28,8 +29,21 @@ class ProveedoresScreen extends ConsumerWidget {
                 child: ListTile(
                   leading: const CircleAvatar(backgroundColor: Colors.purple, child: Icon(Icons.local_shipping, color: Colors.white)),
                   title: Text(p.empresa, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('Contacto: ${p.nombre} \nTel: ${p.contacto}'),
+                  subtitle: Text('Contacto: ${p.nombre} \n${p.contacto}'),
                   isThreeLine: true,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.blue),
+                        onPressed: () => _showProveedorModal(context, ref, proveedorAEditar: p),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        onPressed: () => _confirmarEliminacion(context, ref, p),
+                      ),
+                    ],
+                  ),
                 ),
               );
             },
@@ -37,58 +51,142 @@ class ProveedoresScreen extends ConsumerWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _mostrarDialogoNuevoProveedor(context, ref),
+        onPressed: () => _showProveedorModal(context, ref),
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  void _mostrarDialogoNuevoProveedor(BuildContext context, WidgetRef ref) {
+  // MODAL ADAPTADO PARA MODO HORIZONTAL (RESPONSIVO) Y EDICIÓN
+  void _showProveedorModal(BuildContext context, WidgetRef ref, {Proveedor? proveedorAEditar}) {
     final formKey = GlobalKey<FormState>();
-    String empresa = '', nombre = '', contacto = '';
+    final esEdicion = proveedorAEditar != null;
+
+    String empresa = proveedorAEditar?.empresa ?? '';
+    String nombre = proveedorAEditar?.nombre ?? '';
+
+    // Extraemos teléfono y correo del string guardado si es edición
+    String telefono = '';
+    String correo = '';
+    if (esEdicion && proveedorAEditar.contacto.contains(' | ')) {
+      final partes = proveedorAEditar.contacto.split(' | ');
+      telefono = partes[0];
+      correo = partes[1];
+    } else if (esEdicion) {
+      telefono = proveedorAEditar.contacto;
+    }
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('Nuevo Proveedor'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Nombre de la Empresa'),
-                validator: (val) => val!.isEmpty ? 'Requerido' : null,
-                onSaved: (val) => empresa = val!,
+        title: Text(esEdicion ? 'Editar Proveedor' : 'Nuevo Proveedor'),
+        // AQUÍ ESTÁ LA SOLUCIÓN HORIZONTAL: Scroll + Padding dinámico para el teclado
+        content: Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    initialValue: empresa,
+                    decoration: const InputDecoration(labelText: 'Nombre de la Empresa'),
+                    textCapitalization: TextCapitalization.words,
+                    validator: (val) => val == null || val.trim().isEmpty ? 'Obligatorio' : null,
+                    onSaved: (val) => empresa = val!,
+                  ),
+                  TextFormField(
+                    initialValue: nombre,
+                    decoration: const InputDecoration(labelText: 'Nombre del Contacto'),
+                    textCapitalization: TextCapitalization.words,
+                    validator: (val) => val == null || val.trim().isEmpty ? 'Obligatorio' : null,
+                    onSaved: (val) => nombre = val!,
+                  ),
+                  TextFormField(
+                    initialValue: telefono,
+                    decoration: const InputDecoration(labelText: 'Teléfono (Obligatorio)'),
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    validator: (val) => val == null || val.length < 7 ? 'Teléfono inválido' : null,
+                    onSaved: (val) => telefono = val!,
+                  ),
+                  TextFormField(
+                    initialValue: correo,
+                    decoration: const InputDecoration(labelText: 'Correo (Opcional)'),
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (val) {
+                      if (val != null && val.isNotEmpty) {
+                        final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                        if (!emailRegex.hasMatch(val)) return 'Correo inválido';
+                      }
+                      return null;
+                    },
+                    onSaved: (val) => correo = val ?? '',
+                  ),
+                ],
               ),
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Nombre del Contacto (Vendedor)'),
-                validator: (val) => val!.isEmpty ? 'Requerido' : null,
-                onSaved: (val) => nombre = val!,
-              ),
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Teléfono / WhatsApp'),
-                keyboardType: TextInputType.phone,
-                validator: (val) => val!.isEmpty ? 'Requerido' : null,
-                onSaved: (val) => contacto = val!,
-              ),
-            ],
+            ),
           ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (formKey.currentState!.validate()) {
                 formKey.currentState!.save();
-                final nuevo = Proveedor(id: const Uuid().v4(), nombre: nombre, contacto: contacto, empresa: empresa);
-                ref.read(proveedoresProvider.notifier).addProveedor(nuevo);
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Proveedor guardado')));
+
+                String contactoFinal = telefono.trim();
+                if (correo.trim().isNotEmpty) contactoFinal += ' | ${correo.trim()}';
+
+                final proveedorModificado = Proveedor(
+                    id: esEdicion ? proveedorAEditar.id : const Uuid().v4(),
+                    nombre: nombre.trim(),
+                    contacto: contactoFinal,
+                    empresa: empresa.trim()
+                );
+
+                if (esEdicion) {
+                  await ref.read(proveedoresProvider.notifier).updateProveedor(proveedorModificado);
+                } else {
+                  await ref.read(proveedoresProvider.notifier).addProveedor(proveedorModificado);
+                }
+
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(esEdicion ? 'Proveedor actualizado' : 'Proveedor guardado'),
+                    backgroundColor: Colors.green,
+                  ));
+                }
               }
             },
-            child: const Text('Guardar'),
+            child: Text(esEdicion ? 'Actualizar' : 'Guardar'),
           )
+        ],
+      ),
+    );
+  }
+
+  void _confirmarEliminacion(BuildContext context, WidgetRef ref, Proveedor p) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar Proveedor'),
+        content: Text('¿Estás seguro de que deseas eliminar a "${p.empresa}" de tu directorio?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () async {
+              await ref.read(proveedoresProvider.notifier).deleteProveedor(p.id);
+              if (context.mounted) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Proveedor eliminado'), backgroundColor: Colors.orange));
+              }
+            },
+            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+          ),
         ],
       ),
     );

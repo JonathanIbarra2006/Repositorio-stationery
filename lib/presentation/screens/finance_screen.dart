@@ -1,16 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../domain/models/transaction.dart';
 import '../providers/transaction_provider.dart';
 import '../../core/utils/pdf_service.dart';
+import 'venta_contado_screen.dart';
 
-class FinanceScreen extends ConsumerWidget {
+class FinanceScreen extends ConsumerStatefulWidget {
   const FinanceScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FinanceScreen> createState() => _FinanceScreenState();
+}
+
+class _FinanceScreenState extends ConsumerState<FinanceScreen> {
+  DateTimeRange? _rangoFechas; // Guarda las fechas seleccionadas
+
+  @override
+  Widget build(BuildContext context) {
     final transState = ref.watch(transactionsProvider);
     final currency = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 
@@ -18,23 +27,36 @@ class FinanceScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Caja y Finanzas'),
         actions: [
+          // NUEVO BOTÓN: FILTRO POR FECHAS (CALENDARIO)
+          IconButton(
+            icon: const Icon(Icons.date_range, color: Colors.blueAccent),
+            tooltip: 'Filtrar por fecha',
+            onPressed: () async {
+              final picked = await showDateRangePicker(
+                context: context,
+                firstDate: DateTime(2024), // Desde cuando se usa la app
+                lastDate: DateTime.now(),
+                initialDateRange: _rangoFechas,
+                helpText: 'Selecciona las fechas a consultar',
+              );
+
+              if (picked != null) {
+                setState(() => _rangoFechas = picked);
+                ref.read(transactionsProvider.notifier).loadTransactions(startDate: picked.start, endDate: picked.end);
+              }
+            },
+          ),
+          // BOTÓN DE PDF (Existente)
           transState.when(
             data: (data) => IconButton(
               icon: const Icon(Icons.picture_as_pdf, color: Colors.red),
               tooltip: 'Exportar Reporte PDF',
               onPressed: () async {
                 if (data.transactions.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('No hay datos para exportar'))
-                  );
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No hay datos para exportar')));
                   return;
                 }
-                await PdfService.generarYCompartirReporteCaja(
-                    data.transactions,
-                    data.totalIngresos,
-                    data.totalGastos,
-                    data.balance
-                );
+                await PdfService.generarYCompartirReporteCaja(data.transactions, data.totalIngresos, data.totalGastos, data.balance);
               },
             ),
             loading: () => const SizedBox.shrink(),
@@ -42,68 +64,102 @@ class FinanceScreen extends ConsumerWidget {
           )
         ],
       ),
-      body: transState.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
-        data: (data) => Column(
-          children: [
-            // --- TARJETA DE RESUMEN (DASHBOARD BÁSICO) ---
+      body: Column(
+        children: [
+          // INDICADOR DE FILTRO ACTIVO
+          if (_rangoFechas != null)
             Container(
-              padding: const EdgeInsets.all(16),
-              color: Colors.blueAccent.withOpacity(0.1),
+              color: Colors.orange.shade100,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _ResumenItem('Ingresos', currency.format(data.totalIngresos), Colors.green),
-                  _ResumenItem('Gastos', currency.format(data.totalGastos), Colors.red),
-                  _ResumenItem('Balance', currency.format(data.balance), Colors.blue),
+                  Text(
+                    'Filtrando: ${DateFormat('dd/MM/yy').format(_rangoFechas!.start)} al ${DateFormat('dd/MM/yy').format(_rangoFechas!.end)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepOrange),
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.clear, size: 18),
+                    label: const Text('Limpiar'),
+                    onPressed: () {
+                      setState(() => _rangoFechas = null);
+                      ref.read(transactionsProvider.notifier).loadTransactions(); // Recarga todo sin filtro
+                    },
+                  )
                 ],
               ),
             ),
-            const SizedBox(height: 10),
 
-            // --- LISTA DE TRANSACCIONES ---
-            Expanded(
-              child: ListView.builder(
-                itemCount: data.transactions.length,
-                itemBuilder: (context, index) {
-                  final t = data.transactions[index];
-                  final isIngreso = t.tipo == TransactionType.ingreso;
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: isIngreso ? Colors.green[100] : Colors.red[100],
-                      child: Icon(
-                        isIngreso ? Icons.arrow_downward : Icons.arrow_upward,
-                        color: isIngreso ? Colors.green : Colors.red,
+          // DASHBOARD Y LISTADO (Existente)
+          Expanded(
+            child: transState.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, _) => Center(child: Text('Error: $err')),
+              data: (data) {
+                return Column(
+                  children: [
+                    // Dashboard de Totales
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      margin: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.grey.withAlpha(50), blurRadius: 10, spreadRadius: 2)]),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildResumen('Ingresos', data.totalIngresos, Colors.green, currency),
+                          _buildResumen('Gastos', data.totalGastos, Colors.red, currency),
+                          _buildResumen('Balance', data.balance, Colors.blue, currency),
+                        ],
                       ),
                     ),
-                    title: Text(t.descripcion),
-                    subtitle: Text(DateFormat('dd/MM/yyyy hh:mm a').format(t.fecha)),
-                    trailing: Text(
-                      '${isIngreso ? '+' : '-'}${currency.format(t.monto)}',
-                      style: TextStyle(
-                        color: isIngreso ? Colors.green : Colors.red,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                    const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Align(alignment: Alignment.centerLeft, child: Text('Historial de Movimientos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)))),
+                    const SizedBox(height: 10),
+
+                    // Lista de transacciones
+                    Expanded(
+                      child: data.transactions.isEmpty
+                          ? const Center(child: Text('No hay movimientos en estas fechas.'))
+                          : ListView.builder(
+                        itemCount: data.transactions.length,
+                        itemBuilder: (ctx, i) {
+                          final t = data.transactions[i];
+                          final esIngreso = t.tipo == TransactionType.ingreso;
+                          return ListTile(
+                            leading: CircleAvatar(backgroundColor: esIngreso ? Colors.green[100] : Colors.red[100], child: Icon(esIngreso ? Icons.arrow_upward : Icons.arrow_downward, color: esIngreso ? Colors.green : Colors.red)),
+                            title: Text(t.descripcion),
+                            subtitle: Text('${DateFormat('dd MMM yyyy - hh:mm a').format(t.fecha)}\nCategoría: ${t.categoria}'),
+                            isThreeLine: true,
+                            trailing: Text(currency.format(t.monto), style: TextStyle(color: esIngreso ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 16)),
+                          );
+                        },
                       ),
                     ),
-                  );
-                },
-              ),
+                  ],
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
 
-      // BOTONES FLOTANTES PARA INGRESOS Y GASTOS
+      // BOTONES INFERIORES (Existentes)
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          FloatingActionButton.extended(
+            heroTag: 'btnVender',
+            backgroundColor: Colors.blueAccent,
+            icon: const Icon(Icons.point_of_sale, color: Colors.white),
+            label: const Text('Vender (Contado)', style: TextStyle(color: Colors.white)),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const VentaContadoScreen())),
+          ),
+          const SizedBox(height: 10),
           FloatingActionButton.extended(
             heroTag: 'btnGasto',
             backgroundColor: Colors.red[400],
             icon: const Icon(Icons.remove, color: Colors.white),
-            label: const Text('Gasto', style: TextStyle(color: Colors.white)),
+            label: const Text('Registrar Gasto', style: TextStyle(color: Colors.white)),
             onPressed: () => _showTransactionModal(context, ref, TransactionType.gasto),
           ),
           const SizedBox(height: 10),
@@ -111,7 +167,7 @@ class FinanceScreen extends ConsumerWidget {
             heroTag: 'btnIngreso',
             backgroundColor: Colors.green[500],
             icon: const Icon(Icons.add, color: Colors.white),
-            label: const Text('Ingreso', style: TextStyle(color: Colors.white)),
+            label: const Text('Ingreso Extra', style: TextStyle(color: Colors.white)),
             onPressed: () => _showTransactionModal(context, ref, TransactionType.ingreso),
           ),
         ],
@@ -119,95 +175,75 @@ class FinanceScreen extends ConsumerWidget {
     );
   }
 
-  // --- MODAL CON VALIDACIONES (HU01 y HU02) ---
+  Widget _buildResumen(String titulo, double valor, Color color, NumberFormat currency) {
+    return Column(
+      children: [
+        Text(titulo, style: const TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 5),
+        Text(currency.format(valor), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+      ],
+    );
+  }
+
   void _showTransactionModal(BuildContext context, WidgetRef ref, TransactionType tipo) {
     final formKey = GlobalKey<FormState>();
     double monto = 0;
     String descripcion = '';
-    String categoria = 'Servicios'; // Por defecto para gastos
-
-    final isGasto = tipo == TransactionType.gasto;
+    String categoria = '';
+    final esIngreso = tipo == TransactionType.ingreso;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          left: 16, right: 16, top: 16,
-        ),
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 16, right: 16, top: 16),
         child: Form(
           key: formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(isGasto ? 'Registrar Gasto' : 'Registrar Ingreso',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isGasto ? Colors.red : Colors.green)),
+              Text(esIngreso ? 'Nuevo Ingreso Extra' : 'Registrar Gasto', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: esIngreso ? Colors.green : Colors.red)),
               const SizedBox(height: 15),
-
-              // Validación 1: Monto no puede estar vacío ni ser 0
               TextFormField(
-                decoration: const InputDecoration(labelText: 'Monto (\$)', border: OutlineInputBorder()),
+                decoration: InputDecoration(labelText: 'Monto (\$)', border: const OutlineInputBorder(), prefixIcon: Icon(Icons.attach_money, color: esIngreso ? Colors.green : Colors.red)),
                 keyboardType: TextInputType.number,
-                validator: (val) {
-                  if (val == null || val.isEmpty) return 'El monto es obligatorio';
-                  if (double.tryParse(val) == null || double.parse(val) <= 0) return 'Ingrese un valor válido mayor a 0';
-                  return null;
-                },
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: (val) => val == null || val.isEmpty ? 'Requerido' : null,
                 onSaved: (val) => monto = double.parse(val!),
               ),
               const SizedBox(height: 10),
-
-              // Validación 2: Concepto obligatorio
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Concepto / Descripción', border: OutlineInputBorder()),
-                validator: (val) => val == null || val.isEmpty ? 'Debe ingresar una descripción' : null,
-                onSaved: (val) => descripcion = val!,
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(labelText: 'Categoría', border: OutlineInputBorder()),
+                items: (esIngreso ? ['Otros Ingresos'] : ['Servicios', 'Proveedores', 'Insumos', 'Nómina', 'Otros'])
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                validator: (val) => val == null || val.isEmpty ? 'Requerido' : null,
+                onChanged: (val) => categoria = val!,
+                onSaved: (val) => categoria = val!,
               ),
               const SizedBox(height: 10),
-
-              // Si es gasto, mostramos el Dropdown de Categorías (Como aprendimos en el paso anterior)
-              if (isGasto)
-                DropdownButtonFormField<String>(
-                  value: categoria,
-                  decoration: const InputDecoration(labelText: 'Categoría', border: OutlineInputBorder()),
-                  items: ['Servicios', 'Proveedores', 'Insumos', 'Nómina', 'Otros']
-                      .map((cat) => DropdownMenuItem(value: cat, child: Text(cat)))
-                      .toList(),
-                  onChanged: (val) => categoria = val!,
-                ),
-
+              TextFormField(
+                decoration: const InputDecoration(labelText: 'Descripción / Concepto', border: OutlineInputBorder()),
+                textCapitalization: TextCapitalization.sentences,
+                validator: (val) => val == null || val.isEmpty ? 'Requerido' : null,
+                onSaved: (val) => descripcion = val!,
+              ),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: isGasto ? Colors.red : Colors.green),
-                  child: const Padding(padding: EdgeInsets.all(12.0), child: Text('Guardar', style: TextStyle(color: Colors.white, fontSize: 16))),
+                  style: ElevatedButton.styleFrom(backgroundColor: esIngreso ? Colors.green : Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.all(15)),
                   onPressed: () async {
                     if (formKey.currentState!.validate()) {
                       formKey.currentState!.save();
-
-                      final newTx = AppTransaction(
-                        id: const Uuid().v4(),
-                        tipo: tipo,
-                        monto: monto,
-                        fecha: DateTime.now(),
-                        descripcion: descripcion.trim(),
-                        categoria: isGasto ? categoria : 'Ventas',
-                      );
-
-                      final error = await ref.read(transactionsProvider.notifier).addTransaction(newTx);
-
+                      final transaccion = AppTransaction(id: const Uuid().v4(), tipo: tipo, monto: monto, fecha: DateTime.now(), descripcion: descripcion, categoria: categoria);
+                      await ref.read(transactionRepoProvider).addTransaction(transaccion);
                       if (ctx.mounted) {
+                        ref.invalidate(transactionsProvider);
                         Navigator.pop(ctx);
-                        if (error != null) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
-                        } else {
-                          ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Guardado exitoso'), backgroundColor: Colors.green));
-                        }
                       }
                     }
                   },
+                  child: const Text('Guardar', style: TextStyle(fontSize: 16)),
                 ),
               ),
               const SizedBox(height: 20),
@@ -215,23 +251,6 @@ class FinanceScreen extends ConsumerWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _ResumenItem extends StatelessWidget {
-  final String titulo;
-  final String valor;
-  final Color color;
-  const _ResumenItem(this.titulo, this.valor, this.color);
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(titulo, style: TextStyle(color: Colors.grey[700], fontSize: 14)),
-        Text(valor, style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.bold)),
-      ],
     );
   }
 }
