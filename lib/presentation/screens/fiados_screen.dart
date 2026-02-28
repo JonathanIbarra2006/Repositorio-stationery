@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/fiado_provider.dart';
 import 'nuevo_fiado_screen.dart';
+import 'detalle_cliente_screen.dart'; // <--- ESTO ES VITAL: Importa la pantalla de detalle
 
 class FiadosScreen extends ConsumerWidget {
   const FiadosScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final deudoresAsync = ref.watch(deudoresProvider);
+    // Escuchamos la lista de clientes del Provider
+    final clientesAsync = ref.watch(clientesProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -19,21 +21,45 @@ class FiadosScreen extends ConsumerWidget {
         ),
         title: const Text('Fiados y Clientes', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
-      body: deudoresAsync.when(
-        data: (deudores) {
-          if (deudores.isEmpty) return const Center(child: Text('No hay clientes con deuda'));
+      body: clientesAsync.when(
+        data: (clientes) {
+          if (clientes.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.people_outline, size: 60, color: Colors.grey),
+                  SizedBox(height: 10),
+                  Text('No hay clientes con deuda activa', style: TextStyle(color: Colors.grey)),
+                ],
+              ),
+            );
+          }
+          // LISTA DE CLIENTES
           return ListView.builder(
-            itemCount: deudores.length,
+            itemCount: clientes.length,
             itemBuilder: (ctx, i) {
-              final c = deudores[i];
+              final c = clientes[i];
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                elevation: 2,
                 child: ListTile(
-                  leading: const CircleAvatar(backgroundColor: Colors.orange, child: Icon(Icons.person, color: Colors.white)),
-                  title: Text(c['nombre'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('Tel: ${c['telefono'] ?? "Sin número"}'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {}, // Aquí iría la navegación al detalle
+                  leading: CircleAvatar(
+                      backgroundColor: Colors.orange.shade100,
+                      child: const Icon(Icons.person, color: Colors.orange)
+                  ),
+                  title: Text(c.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text(c.telefono != null && c.telefono!.isNotEmpty ? 'Tel: ${c.telefono}' : 'Sin teléfono'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+
+                  // --- AQUÍ ESTABA EL PROBLEMA ---
+                  // Al tocar la tarjeta, nos lleva a la pantalla de detalle
+                  onTap: () {
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => DetalleClienteScreen(cliente: c))
+                    );
+                  },
                 ),
               );
             },

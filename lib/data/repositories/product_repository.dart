@@ -5,7 +5,6 @@ import '../datasources/database_helper.dart';
 class ProductRepository {
   final dbHelper = DatabaseHelper.instance;
 
-  // 1. Listar productos (con filtro de búsqueda)
   Future<List<Product>> getProducts({String? query}) async {
     final db = await dbHelper.database;
     List<Map<String, dynamic>> maps;
@@ -13,7 +12,7 @@ class ProductRepository {
     if (query != null && query.isNotEmpty) {
       maps = await db.query(
         'productos',
-        where: 'nombre LIKE ? OR categoria LIKE ?',
+        where: 'nombre LIKE ? OR codigo_barras LIKE ?', // Buscamos por nombre O código
         whereArgs: ['%$query%', '%$query%'],
         orderBy: 'nombre ASC',
       );
@@ -24,37 +23,23 @@ class ProductRepository {
     return List.generate(maps.length, (i) => Product.fromMap(maps[i]));
   }
 
-  // 2. Agregar producto (Valida duplicados)
   Future<void> addProduct(Product product) async {
     final db = await dbHelper.database;
 
-    final result = await db.query(
-      'productos',
-      where: 'LOWER(nombre) = ?',
-      whereArgs: [product.nombre.toLowerCase()],
-    );
-
-    if (result.isNotEmpty) {
-      throw Exception('DUPLICADO');
+    // Validación: No permitir códigos de barra duplicados si existen
+    if (product.codigoBarras != null && product.codigoBarras!.isNotEmpty) {
+      final duplicado = await db.query('productos', where: 'codigo_barras = ?', whereArgs: [product.codigoBarras]);
+      if (duplicado.isNotEmpty) throw Exception('Código de barras ya existe');
     }
 
-    await db.insert('productos', product.toMap());
+    await db.insert('productos', product.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  // 3. Eliminar producto (Valida que no esté en uso)
   Future<void> deleteProduct(String id) async {
     final db = await dbHelper.database;
-    try {
-      await db.delete('productos', where: 'id = ?', whereArgs: [id]);
-    } on DatabaseException catch (e) {
-      if (e.toString().contains('FOREIGN KEY')) {
-        throw Exception('EN_USO');
-      }
-      rethrow;
-    }
+    await db.delete('productos', where: 'id = ?', whereArgs: [id]);
   }
 
-  // 4. Editar/Actualizar producto (La función nueva de la Versión 2.0)
   Future<void> updateProduct(Product product) async {
     final db = await dbHelper.database;
     await db.update(
