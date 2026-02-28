@@ -1,0 +1,8 @@
+flutter_launcher_icons:
+  image_path: "assets/images/logo.png" # Ruta a tu logo naranja
+  android: true
+  ios: true
+
+  # Configuración Adaptativa para Android moderno (8+):
+  adaptive_icon_background: "#FFFFFF" # Fondo blanco limpio detrás del logo
+  adaptive_icon_foreground: "assets/images/logo.png" # Tu logo naranja centrado
