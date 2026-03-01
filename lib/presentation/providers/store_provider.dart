@@ -17,19 +17,31 @@ class InventoryNotifier extends StateNotifier<List<Product>> {
   void refresh() {
     state = [..._repo.getProducts()]; // Forzar actualización visual
   }
+
+  void decreaseStock(String productId) {
+    state = [
+      for (final product in state)
+        if (product.id == productId)
+          product.copyWith(stock: product.stock - 1)
+        else
+          product,
+    ];
+  }
 }
 
-final inventoryProvider = StateNotifierProvider<InventoryNotifier, List<Product>>((ref) {
+final inventoryProvider =
+    StateNotifierProvider<InventoryNotifier, List<Product>>((ref) {
   return InventoryNotifier(ref.watch(repositoryProvider));
 });
 
 // 3. Provider del Carrito de Compras (Ventas)
 class CartNotifier extends StateNotifier<List<CartItem>> {
-  CartNotifier() : super([]);
+  final Ref _ref;
+  CartNotifier(this._ref) : super([]);
 
   void addToCart(Product product) {
     // Disminuir stock del producto
-    product.stock--;
+    _ref.read(inventoryProvider.notifier).decreaseStock(product.id);
 
     // Si ya existe, sumamos 1
     final index = state.indexWhere((item) => item.product.id == product.id);
@@ -37,12 +49,16 @@ class CartNotifier extends StateNotifier<List<CartItem>> {
       final existingItem = state[index];
       state = [
         ...state.sublist(0, index),
-        CartItem(product: existingItem.product, quantity: existingItem.quantity + 1),
+        CartItem(
+            product: existingItem.product,
+            quantity: existingItem.quantity + 1),
         ...state.sublist(index + 1),
       ];
     } else {
       // Si no existe, lo agregamos
-      state = [...state, CartItem(product: product)];
+      final updatedProduct =
+          _ref.read(inventoryProvider).firstWhere((p) => p.id == product.id);
+      state = [...state, CartItem(product: updatedProduct)];
     }
   }
 
@@ -58,5 +74,5 @@ class CartNotifier extends StateNotifier<List<CartItem>> {
 }
 
 final cartProvider = StateNotifierProvider<CartNotifier, List<CartItem>>((ref) {
-  return CartNotifier();
+  return CartNotifier(ref);
 });
