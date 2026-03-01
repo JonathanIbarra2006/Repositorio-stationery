@@ -17,6 +17,26 @@ class Product {
     required this.proveedor,
   });
 
+  Product copyWith({
+    String? id,
+    String? nombre,
+    String? categoria,
+    double? precio,
+    int? stock,
+    String? codigoBarras,
+    String? proveedor,
+  }) {
+    return Product(
+      id: id ?? this.id,
+      nombre: nombre ?? this.nombre,
+      categoria: categoria ?? this.categoria,
+      precio: precio ?? this.precio,
+      stock: stock ?? this.stock,
+      codigoBarras: codigoBarras ?? this.codigoBarras,
+      proveedor: proveedor ?? this.proveedor,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,

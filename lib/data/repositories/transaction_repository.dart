@@ -57,4 +57,13 @@ class TransactionRepository {
       await txn.insert('transacciones', ingreso.toMap());
     });
   }
+
+  Future<void> deleteTransaction(String id) async {
+    final db = await dbHelper.database;
+    await db.delete(
+      'transacciones',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
 }

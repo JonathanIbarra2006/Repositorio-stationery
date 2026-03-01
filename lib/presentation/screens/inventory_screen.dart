@@ -3,9 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../domain/models/product.dart';
 import '../providers/product_provider.dart';
-import '../providers/proveedor_provider.dart'; // Importamos para listar proveedores
+import '../providers/proveedor_provider.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
@@ -57,9 +58,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             return Card(
               margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               child: ListTile(
-                // Muestra si tiene código de barras con un icono pequeño
                 leading: p.codigoBarras != null && p.codigoBarras!.isNotEmpty
-                    ? const Icon(Icons.qr_code, color: Colors.black54)
+                    ? const Icon(Icons.qr_code_2, color: Colors.black87)
                     : const Icon(Icons.inventory, color: Colors.blue),
                 title: Text(p.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Column(
@@ -67,6 +67,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   children: [
                     Text('Stock: ${p.stock} | ${p.categoria}'),
                     Text('Prov: ${p.proveedor}', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                    if (p.codigoBarras != null && p.codigoBarras!.isNotEmpty)
+                      Text('Cod: ${p.codigoBarras}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
                   ],
                 ),
                 isThreeLine: true,
@@ -96,31 +98,29 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     final formKey = GlobalKey<FormState>();
     final esEdicion = productoAEditar != null;
 
-    // Controladores y Variables
+    // Variables iniciales
     String nombre = productoAEditar?.nombre ?? '';
-    String? codigoBarras = productoAEditar?.codigoBarras;
+    final codigoBarrasCtrl = TextEditingController(text: productoAEditar?.codigoBarras ?? '');
     int stock = productoAEditar?.stock ?? 0;
     double precio = productoAEditar?.precio ?? 0;
     String categoria = productoAEditar?.categoria ?? '';
 
-    // Lógica del Proveedor Híbrido
+    // Lógica Proveedor
     String? proveedorSeleccionado = productoAEditar?.proveedor;
     bool esProveedorManual = false;
     final manualProveedorCtrl = TextEditingController();
 
-    // Obtenemos la lista de proveedores actuales de la base de datos
+    // Estado local para la validación: EMPIEZA APAGADO
+    AutovalidateMode modoValidacion = AutovalidateMode.disabled;
+
     final proveedoresListAsync = ref.read(proveedoresProvider);
     List<String> listaNombresProveedores = [];
 
-    // Extraemos solo los nombres
     proveedoresListAsync.whenData((proveedores) {
       listaNombresProveedores = proveedores.map((e) => e.empresa).toList();
     });
-
-    // Añadimos opción manual
     listaNombresProveedores.add('OTRO (Escribir Manualmente)');
 
-    // Si estamos editando y el proveedor NO está en la lista (ej. se borró), lo ponemos como manual
     if (esEdicion && !listaNombresProveedores.contains(proveedorSeleccionado) && proveedorSeleccionado != null) {
       proveedorSeleccionado = 'OTRO (Escribir Manualmente)';
       manualProveedorCtrl.text = productoAEditar!.proveedor;
@@ -131,7 +131,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
-        // Usamos StatefulBuilder para manejar el estado interno del modal (mostrar/ocultar campo manual)
+        // StatefulBuilder nos permite actualizar el estado SOLO del modal (para cambiar el modo de validación)
         return StatefulBuilder(
             builder: (context, setModalState) {
               return Padding(
@@ -139,37 +139,48 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 child: SingleChildScrollView(
                   child: Form(
                     key: formKey,
-                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    // AQUÍ ESTÁ EL CAMBIO CLAVE: Usamos la variable en lugar de una constante
+                    autovalidateMode: modoValidacion,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(esEdicion ? 'Editar Producto' : 'Nuevo Producto', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 15),
 
-                        // 1. NOMBRE PRODUCTO
+                        // 1. NOMBRE
                         TextFormField(
                           initialValue: nombre,
                           decoration: const InputDecoration(labelText: 'Nombre Producto *', border: OutlineInputBorder()),
                           textCapitalization: TextCapitalization.sentences,
-                          validator: (v) => v == null || v.isEmpty ? 'Requerido' : null,
-                          onSaved: (v) => nombre = v!,
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Requerido' : null,
+                          onSaved: (v) => nombre = v!.trim(),
                         ),
                         const SizedBox(height: 10),
 
-                        // 2. CÓDIGO DE BARRAS (OPCIONAL)
+                        // 2. CÓDIGO DE BARRAS
                         TextFormField(
-                          initialValue: codigoBarras,
-                          decoration: const InputDecoration(
-                              labelText: 'Código de Barras / QR (Opcional)',
-                              border: OutlineInputBorder(),
-                              suffixIcon: Icon(Icons.qr_code_scanner)
+                          controller: codigoBarrasCtrl,
+                          decoration: InputDecoration(
+                              labelText: 'Código de Barras / QR',
+                              border: const OutlineInputBorder(),
+                              suffixIcon: IconButton(
+                                icon: const Icon(Icons.qr_code_scanner, color: Colors.blue),
+                                onPressed: () async {
+                                  final resultado = await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => const ScannerScreen())
+                                  );
+                                  if (resultado != null) {
+                                    codigoBarrasCtrl.text = resultado;
+                                  }
+                                },
+                              )
                           ),
                           keyboardType: TextInputType.text,
-                          onSaved: (v) => codigoBarras = (v == null || v.isEmpty) ? null : v,
                         ),
                         const SizedBox(height: 10),
 
-                        // 3. CANTIDAD Y PRECIO (En fila)
+                        // 3. CANTIDAD Y PRECIO
                         Row(
                           children: [
                             Expanded(
@@ -208,11 +219,11 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         ),
                         const SizedBox(height: 10),
 
-                        // 5. PROVEEDOR (HÍBRIDO)
+                        // 5. PROVEEDOR
                         DropdownButtonFormField<String>(
                           value: listaNombresProveedores.contains(proveedorSeleccionado) ? proveedorSeleccionado : null,
                           decoration: const InputDecoration(labelText: 'Proveedor *', border: OutlineInputBorder()),
-                          isExpanded: true, // Para evitar overflow con nombres largos
+                          isExpanded: true,
                           items: listaNombresProveedores.map((c) => DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis))).toList(),
                           onChanged: (v) {
                             setModalState(() {
@@ -223,7 +234,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           validator: (v) => v == null ? 'Seleccione proveedor' : null,
                         ),
 
-                        // 6. CAMPO MANUAL DE PROVEEDOR (Solo aparece si selecciona OTRO)
                         if (esProveedorManual)
                           Padding(
                             padding: const EdgeInsets.only(top: 10.0),
@@ -235,7 +245,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                   prefixIcon: Icon(Icons.edit)
                               ),
                               textCapitalization: TextCapitalization.words,
-                              validator: (v) => esProveedorManual && (v == null || v.isEmpty) ? 'Escriba el nombre' : null,
+                              validator: (v) => esProveedorManual && (v == null || v.trim().isEmpty) ? 'Escriba el nombre' : null,
                             ),
                           ),
 
@@ -245,16 +255,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           width: double.infinity,
                           child: ElevatedButton(
                             onPressed: () async {
+                              // INTENTO DE GUARDAR
                               if (formKey.currentState!.validate()) {
+                                // SI ES VÁLIDO: Guardamos
                                 formKey.currentState!.save();
 
-                                // Definir el proveedor final
-                                String proveedorFinal = '';
-                                if (esProveedorManual) {
-                                  proveedorFinal = manualProveedorCtrl.text.trim();
-                                } else {
-                                  proveedorFinal = proveedorSeleccionado!;
-                                }
+                                String proveedorFinal = esProveedorManual ? manualProveedorCtrl.text.trim() : proveedorSeleccionado!;
+                                String? codigoFinal = codigoBarrasCtrl.text.trim().isEmpty ? null : codigoBarrasCtrl.text.trim();
 
                                 final nuevoProd = Product(
                                   id: esEdicion ? productoAEditar!.id : const Uuid().v4(),
@@ -262,7 +269,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                   categoria: categoria,
                                   precio: precio,
                                   stock: stock,
-                                  codigoBarras: codigoBarras,
+                                  codigoBarras: codigoFinal,
                                   proveedor: proveedorFinal,
                                 );
 
@@ -278,6 +285,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                     ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.red));
                                   }
                                 }
+                              } else {
+                                // SI NO ES VÁLIDO (HAY ERRORES):
+                                // Activamos el modo "onUserInteraction" para que ahora sí muestre los errores en rojo
+                                // y le ayude al usuario a corregir.
+                                setModalState(() {
+                                  modoValidacion = AutovalidateMode.onUserInteraction;
+                                });
                               }
                             },
                             child: Text(esEdicion ? 'Actualizar Producto' : 'Guardar Producto'),
@@ -297,5 +311,112 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 
   void _confirmDelete(BuildContext context, WidgetRef ref, Product p) {
     showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text('Eliminar'), content: Text('¿Borrar ${p.nombre}?'), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')), TextButton(onPressed: () { ref.read(productsProvider.notifier).deleteProduct(p.id); Navigator.pop(ctx); }, child: const Text('Eliminar', style: TextStyle(color: Colors.red)))]));
+  }
+}
+
+// -----------------------------------------------------------
+// PANTALLA DE ESCÁNER (INTACTA)
+// -----------------------------------------------------------
+class ScannerScreen extends StatefulWidget {
+  const ScannerScreen({super.key});
+
+  @override
+  State<ScannerScreen> createState() => _ScannerScreenState();
+}
+
+class _ScannerScreenState extends State<ScannerScreen> {
+  bool _codigoDetectado = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Escanear Código'),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          MobileScanner(
+            onDetect: (capture) {
+              if (_codigoDetectado) return;
+
+              final List<Barcode> barcodes = capture.barcodes;
+              for (final barcode in barcodes) {
+                if (barcode.rawValue != null) {
+                  setState(() {
+                    _codigoDetectado = true;
+                  });
+                  HapticFeedback.mediumImpact();
+                  Navigator.pop(context, barcode.rawValue);
+                  break;
+                }
+              }
+            },
+          ),
+          ColorFiltered(
+            colorFilter: ColorFilter.mode(
+              Colors.black.withOpacity(0.5),
+              BlendMode.srcOut,
+            ),
+            child: Stack(
+              children: [
+                Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.transparent,
+                    backgroundBlendMode: BlendMode.dstOut,
+                  ),
+                ),
+                Center(
+                  child: Container(
+                    width: 280,
+                    height: 280,
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Center(
+            child: Container(
+              width: 280,
+              height: 280,
+              decoration: BoxDecoration(
+                  border: Border.all(color: Colors.redAccent, width: 3),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.redAccent.withOpacity(0.2),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    )
+                  ]
+              ),
+              child: const Center(
+                child: Icon(Icons.qr_code_scanner, color: Colors.white24, size: 80),
+              ),
+            ),
+          ),
+          const Positioned(
+            bottom: 80,
+            left: 0,
+            right: 0,
+            child: Text(
+              "Apunta el código dentro del cuadro",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          )
+        ],
+      ),
+    );
   }
 }

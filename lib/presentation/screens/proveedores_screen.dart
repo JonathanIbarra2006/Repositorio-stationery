@@ -69,6 +69,7 @@ class ProveedoresScreen extends ConsumerWidget {
     final formKey = GlobalKey<FormState>();
     final esEdicion = p != null;
 
+    // Variables locales
     String empresa = p?.empresa ?? '';
     String nombre = p?.nombre ?? '';
     String telefono = '';
@@ -80,102 +81,117 @@ class ProveedoresScreen extends ConsumerWidget {
       if (partes.length > 1) correo = partes[1];
     }
 
+    // Variable de estado para controlar la validación (Patrón Lazy Validation)
+    AutovalidateMode autovalidateMode = AutovalidateMode.disabled;
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Text(esEdicion ? 'Editar Proveedor' : 'Nuevo Proveedor'),
-        content: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            autovalidateMode: AutovalidateMode.onUserInteraction,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  initialValue: empresa,
-                  decoration: const InputDecoration(labelText: 'Nombre de la Empresa *', prefixIcon: Icon(Icons.business)),
-                  textCapitalization: TextCapitalization.words,
-                  validator: (val) => (val == null || val.trim().isEmpty) ? 'Requerido' : null,
-                  onSaved: (val) => empresa = val!.trim(),
-                ),
-                const SizedBox(height: 10),
+      builder: (ctx) {
+        // StatefulBuilder permite actualizar SOLO el diálogo sin redibujar toda la pantalla
+        return StatefulBuilder(
+            builder: (context, setModalState) {
+              return AlertDialog(
+                title: Text(esEdicion ? 'Editar Proveedor' : 'Nuevo Proveedor'),
+                content: SingleChildScrollView(
+                  child: Form(
+                    key: formKey,
+                    // AQUI EL CAMBIO CLAVE: Usamos la variable dinámica
+                    autovalidateMode: autovalidateMode,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextFormField(
+                          initialValue: empresa,
+                          decoration: const InputDecoration(labelText: 'Nombre de la Empresa *', prefixIcon: Icon(Icons.business)),
+                          textCapitalization: TextCapitalization.words,
+                          validator: (val) => (val == null || val.trim().isEmpty) ? 'Requerido' : null,
+                          onSaved: (val) => empresa = val!.trim(),
+                        ),
+                        const SizedBox(height: 10),
 
-                TextFormField(
-                  initialValue: nombre,
-                  decoration: const InputDecoration(labelText: 'Nombre del Encargado *', prefixIcon: Icon(Icons.person)),
-                  textCapitalization: TextCapitalization.words,
-                  validator: (val) => (val == null || val.trim().isEmpty) ? 'Requerido' : null,
-                  onSaved: (val) => nombre = val!.trim(),
-                ),
-                const SizedBox(height: 10),
+                        TextFormField(
+                          initialValue: nombre,
+                          decoration: const InputDecoration(labelText: 'Nombre del Encargado *', prefixIcon: Icon(Icons.person)),
+                          textCapitalization: TextCapitalization.words,
+                          validator: (val) => (val == null || val.trim().isEmpty) ? 'Requerido' : null,
+                          onSaved: (val) => nombre = val!.trim(),
+                        ),
+                        const SizedBox(height: 10),
 
-                TextFormField(
-                  initialValue: telefono,
-                  decoration: const InputDecoration(labelText: 'Teléfono *', prefixIcon: Icon(Icons.phone)),
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) return 'Requerido';
-                    if (val.length < 7) return 'Mínimo 7 dígitos';
-                    return null;
-                  },
-                  onSaved: (val) => telefono = val!.trim(),
-                ),
-                const SizedBox(height: 10),
+                        TextFormField(
+                          initialValue: telefono,
+                          decoration: const InputDecoration(labelText: 'Teléfono *', prefixIcon: Icon(Icons.phone)),
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) return 'Requerido';
+                            if (val.length < 7) return 'Mínimo 7 dígitos';
+                            return null;
+                          },
+                          onSaved: (val) => telefono = val!.trim(),
+                        ),
+                        const SizedBox(height: 10),
 
-                // --- CAMPO CORREO CON VALIDACIÓN ---
-                TextFormField(
-                  initialValue: correo,
-                  decoration: const InputDecoration(
-                      labelText: 'Correo (Opcional)',
-                      prefixIcon: Icon(Icons.email),
-                      hintText: 'ejemplo@correo.com'
+                        TextFormField(
+                          initialValue: correo,
+                          decoration: const InputDecoration(
+                              labelText: 'Correo (Opcional)',
+                              prefixIcon: Icon(Icons.email),
+                              hintText: 'ejemplo@correo.com'
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (val) {
+                            if (val != null && val.isNotEmpty) {
+                              final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                              if (!emailRegex.hasMatch(val)) {
+                                return 'Correo inválido (falta @ o .)';
+                              }
+                            }
+                            return null;
+                          },
+                          onSaved: (val) => correo = val?.trim() ?? '',
+                        ),
+                      ],
+                    ),
                   ),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (val) {
-                    if (val != null && val.isNotEmpty) {
-                      // Regex simple para validar email
-                      final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-                      if (!emailRegex.hasMatch(val)) {
-                        return 'Correo inválido (falta @ o .)';
-                      }
-                    }
-                    return null;
-                  },
-                  onSaved: (val) => correo = val?.trim() ?? '',
                 ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          ElevatedButton(
-              onPressed: () {
-                if (formKey.currentState!.validate()) {
-                  formKey.currentState!.save();
-                  String contactoFinal = telefono;
-                  if (correo.isNotEmpty) contactoFinal += ' | $correo';
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+                  ElevatedButton(
+                      onPressed: () {
+                        if (formKey.currentState!.validate()) {
+                          // SI TODO ESTÁ BIEN
+                          formKey.currentState!.save();
+                          String contactoFinal = telefono;
+                          if (correo.isNotEmpty) contactoFinal += ' | $correo';
 
-                  final nuevo = Proveedor(
-                      id: esEdicion ? p!.id : const Uuid().v4(),
-                      nombre: nombre,
-                      contacto: contactoFinal,
-                      empresa: empresa
-                  );
+                          final nuevo = Proveedor(
+                              id: esEdicion ? p!.id : const Uuid().v4(),
+                              nombre: nombre,
+                              contacto: contactoFinal,
+                              empresa: empresa
+                          );
 
-                  esEdicion
-                      ? ref.read(proveedoresProvider.notifier).updateProveedor(nuevo)
-                      : ref.read(proveedoresProvider.notifier).addProveedor(nuevo);
+                          esEdicion
+                              ? ref.read(proveedoresProvider.notifier).updateProveedor(nuevo)
+                              : ref.read(proveedoresProvider.notifier).addProveedor(nuevo);
 
-                  Navigator.pop(ctx);
-                }
-              },
-              child: const Text('Guardar')
-          )
-        ],
-      ),
+                          Navigator.pop(ctx);
+                        } else {
+                          // SI HAY ERRORES: Activamos el modo rojo
+                          setModalState(() {
+                            autovalidateMode = AutovalidateMode.onUserInteraction;
+                          });
+                        }
+                      },
+                      child: const Text('Guardar')
+                  )
+                ],
+              );
+            }
+        );
+      },
     );
   }
 

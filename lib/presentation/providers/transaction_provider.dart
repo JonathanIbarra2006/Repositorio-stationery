@@ -56,6 +56,15 @@ class TransactionNotifier extends StateNotifier<AsyncValue<TransactionState>> {
       return 'Error al guardar la transacción.';
     }
   }
+
+  Future<void> deleteTransaction(String id) async {
+    try {
+      await _repository.deleteTransaction(id);
+      loadTransactions();
+    } catch (e) {
+      // Manejar el error apropiadamente
+    }
+  }
 }
 
 final transactionsProvider = StateNotifierProvider<TransactionNotifier, AsyncValue<TransactionState>>((ref) {
