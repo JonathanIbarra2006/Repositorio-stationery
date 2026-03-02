@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../domain/models/transaction.dart';
 import '../providers/transaction_provider.dart';
+import 'venta_contado_screen.dart';
+import '../../core/utils/pdf_generator.dart';
 
 class FinanceScreen extends ConsumerWidget {
   const FinanceScreen({super.key});
@@ -22,27 +24,39 @@ class FinanceScreen extends ConsumerWidget {
           child: Image.asset('assets/images/logo.png'),
         ),
         title: const Text('Finanzas', style: TextStyle(fontWeight: FontWeight.bold)),
+        actions: [
+          // BOTÓN DE EXPORTAR PDF
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf, color: Colors.redAccent),
+            tooltip: 'Exportar Reporte PDF',
+            onPressed: () async {
+              // Obtenemos los datos actuales
+              final state = ref.read(transactionsProvider).valueOrNull;
+              if (state == null || state.transactions.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No hay datos para exportar')));
+                return;
+              }
+              // Generamos el reporte
+              await PdfGenerator.generateFinanceReport(state.transactions);
+            },
+          ),
+          const SizedBox(width: 10),
+        ],
       ),
       body: Column(
         children: [
-          // -------------------------------------------------------
           // 1. TARJETAS DE RESUMEN
-          // -------------------------------------------------------
           transactionsAsync.when(
-            data: (transactionState) {
-              final ingresos = transactionState.totalIngresos;
-              final gastos = transactionState.totalGastos;
-              final balance = transactionState.balance;
-
+            data: (state) {
               return Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Row(
                   children: [
-                    Expanded(child: _InfoCard('Ingresos', ingresos, Colors.green, Icons.arrow_upward)),
+                    Expanded(child: _InfoCard('Ingresos', state.totalIngresos, Colors.green, Icons.arrow_upward)),
                     const SizedBox(width: 10),
-                    Expanded(child: _InfoCard('Gastos', gastos, Colors.red, Icons.arrow_downward)),
+                    Expanded(child: _InfoCard('Gastos', state.totalGastos, Colors.red, Icons.arrow_downward)),
                     const SizedBox(width: 10),
-                    Expanded(child: _InfoCard('Balance', balance, Colors.blue, Icons.account_balance_wallet)),
+                    Expanded(child: _InfoCard('Balance', state.balance, Colors.blue, Icons.account_balance_wallet)),
                   ],
                 ),
               );
@@ -60,19 +74,19 @@ class FinanceScreen extends ConsumerWidget {
             ),
           ),
 
-          // -------------------------------------------------------
-          // 2. LISTA DE MOVIMIENTOS (Solo Lectura)
-          // -------------------------------------------------------
+          // 2. LISTA DE MOVIMIENTOS
           Expanded(
             child: transactionsAsync.when(
-              data: (transactionState) {
-                final list = transactionState.transactions;
-                if (list.isEmpty) return const Center(child: Text('No hay movimientos registrados.'));
+              data: (state) {
+                if (state.transactions.isEmpty) return const Center(child: Text('No hay movimientos registrados.'));
+
+                final sortedList = [...state.transactions];
+                sortedList.sort((a, b) => b.fecha.compareTo(a.fecha));
 
                 return ListView.builder(
-                  itemCount: list.length,
+                  itemCount: sortedList.length,
                   itemBuilder: (ctx, i) {
-                    final t = list[i];
+                    final t = sortedList[i];
                     final isIngreso = t.tipo == TransactionType.ingreso;
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
@@ -85,7 +99,7 @@ class FinanceScreen extends ConsumerWidget {
                           ),
                         ),
                         title: Text(t.descripcion, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${DateFormat('dd/MM/yyyy').format(t.fecha)} - ${t.categoria}'),
+                        subtitle: Text('${DateFormat('dd/MM/yyyy').format(t.fecha)} - ${t.categoria ?? ''}'),
                         trailing: Text(
                           '${isIngreso ? '+' : '-'} ${currency.format(t.monto)}',
                           style: TextStyle(
@@ -106,48 +120,59 @@ class FinanceScreen extends ConsumerWidget {
         ],
       ),
 
-      // -------------------------------------------------------
-      // 3. BOTONES FLOTANTES
-      // -------------------------------------------------------
+      // 3. BOTONES DE ACCIÓN
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           FloatingActionButton.extended(
             heroTag: 'gasto',
             onPressed: () => _showTransactionModal(context, ref, 'gasto'),
-            label: const Text('Registrar Gasto'),
+            label: const Text('Gasto'),
             icon: const Icon(Icons.remove_circle_outline),
             backgroundColor: Colors.redAccent,
             foregroundColor: Colors.white,
           ),
           const SizedBox(height: 10),
+
           FloatingActionButton.extended(
             heroTag: 'ingreso',
             onPressed: () => _showTransactionModal(context, ref, 'ingreso'),
             label: const Text('Ingreso Extra'),
-            icon: const Icon(Icons.add_circle_outline),
-            backgroundColor: Colors.green,
+            icon: const Icon(Icons.attach_money),
+            backgroundColor: Colors.blue,
             foregroundColor: Colors.white,
+          ),
+          const SizedBox(height: 15),
+
+          FloatingActionButton.extended(
+            heroTag: 'venta',
+            onPressed: () {
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const VentaDeContadoScreen())
+              );
+            },
+            label: const Text('NUEVA VENTA', style: TextStyle(fontWeight: FontWeight.bold)),
+            icon: const Icon(Icons.point_of_sale, size: 28),
+            backgroundColor: Colors.teal,
+            foregroundColor: Colors.white,
+            elevation: 6,
           ),
         ],
       ),
     );
   }
 
-  // -------------------------------------------------------
-  // MODAL (Lazy Validation)
-  // -------------------------------------------------------
-  void _showTransactionModal(BuildContext context, WidgetRef ref, String tipo) {
+  void _showTransactionModal(BuildContext context, WidgetRef ref, String tipoString) {
     final formKey = GlobalKey<FormState>();
     double monto = 0;
     String descripcion = '';
-    String categoria = tipo == 'ingreso' ? 'Ventas Extra' : 'Servicios';
+    String categoria = tipoString == 'ingreso' ? 'Ventas Extra' : 'Servicios';
 
-    final categorias = tipo == 'ingreso'
+    final categorias = tipoString == 'ingreso'
         ? ['Ventas Extra', 'Aporte Capital', 'Préstamo', 'Otros']
         : ['Servicios', 'Arriendo', 'Nómina', 'Proveedores', 'Mantenimiento', 'Otros'];
-
-    AutovalidateMode autovalidateMode = AutovalidateMode.disabled;
 
     showModalBottomSheet(
         context: context,
@@ -163,16 +188,15 @@ class FinanceScreen extends ConsumerWidget {
                   child: SingleChildScrollView(
                     child: Form(
                       key: formKey,
-                      autovalidateMode: autovalidateMode,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                              tipo == 'ingreso' ? 'Nuevo Ingreso' : 'Nuevo Gasto',
+                              tipoString == 'ingreso' ? 'Nuevo Ingreso' : 'Nuevo Gasto',
                               style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
-                                  color: tipo == 'ingreso' ? Colors.green : Colors.red
+                                  color: tipoString == 'ingreso' ? Colors.green : Colors.red
                               )
                           ),
                           const SizedBox(height: 15),
@@ -199,7 +223,7 @@ class FinanceScreen extends ConsumerWidget {
                           const SizedBox(height: 10),
 
                           DropdownButtonFormField<String>(
-                            value: categoria,
+                            initialValue: categoria,
                             decoration: const InputDecoration(labelText: 'Categoría', prefixIcon: Icon(Icons.category), border: OutlineInputBorder()),
                             items: categorias.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                             onChanged: (val) => categoria = val!,
@@ -211,7 +235,7 @@ class FinanceScreen extends ConsumerWidget {
                             height: 50,
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                  backgroundColor: tipo == 'ingreso' ? Colors.green : Colors.red,
+                                  backgroundColor: tipoString == 'ingreso' ? Colors.green : Colors.red,
                                   foregroundColor: Colors.white
                               ),
                               onPressed: () {
@@ -220,7 +244,7 @@ class FinanceScreen extends ConsumerWidget {
 
                                   final nuevaTransaccion = AppTransaction(
                                       id: const Uuid().v4(),
-                                      tipo: tipo == 'ingreso' ? TransactionType.ingreso : TransactionType.gasto,
+                                      tipo: tipoString == 'ingreso' ? TransactionType.ingreso : TransactionType.gasto,
                                       monto: monto,
                                       fecha: DateTime.now(),
                                       descripcion: descripcion,
@@ -228,14 +252,10 @@ class FinanceScreen extends ConsumerWidget {
                                   );
 
                                   ref.read(transactionsProvider.notifier).addTransaction(nuevaTransaccion);
-                                  Navigator.pop(ctx);
-                                } else {
-                                  setModalState(() {
-                                    autovalidateMode = AutovalidateMode.onUserInteraction;
-                                  });
+                                  Navigator.pop(context);
                                 }
                               },
-                              child: const Text('Guardar', style: TextStyle(fontSize: 18)),
+                              child: const Text('Guardar Movimiento', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                             ),
                           ),
                           const SizedBox(height: 20),
@@ -251,9 +271,6 @@ class FinanceScreen extends ConsumerWidget {
   }
 }
 
-// -----------------------------------------------------------
-// WIDGET AUXILIAR (Aquí hicimos el cambio de formato)
-// -----------------------------------------------------------
 class _InfoCard extends StatelessWidget {
   final String title;
   final double amount;
@@ -264,19 +281,26 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // CAMBIO: Cambiamos 'compactCurrency' (ej: 22 mil) por 'currency' (ej: 22.000)
     final currency = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
-
     return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: color.withAlpha((255 * 0.1).round()), borderRadius: BorderRadius.circular(10)),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+          color: color.withAlpha(25),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withAlpha(50))
+      ),
       child: Column(
         children: [
-          Icon(icon, color: color),
+          Icon(icon, color: color, size: 20),
           const SizedBox(height: 5),
-          Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
-          // Aquí aplicamos el formato numérico completo
-          Text(currency.format(amount), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(title, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 2),
+          FittedBox(
+            child: Text(
+              currency.format(amount),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color),
+            ),
+          ),
         ],
       ),
     );
