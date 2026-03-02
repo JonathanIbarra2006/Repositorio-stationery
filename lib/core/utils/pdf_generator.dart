@@ -6,17 +6,45 @@ import '../../domain/models/product.dart';
 import '../../domain/models/transaction.dart';
 
 class PdfGenerator {
-  // -----------------------------------------------------------------
-  // 1. GENERAR RECIBO DE VENTA (Ticket)
-  // -----------------------------------------------------------------
+
+  // =================================================================
+  //  SECCIÓN DE VENTAS (TICKET)
+  // =================================================================
+
   static Future<void> generateReceipt(Map<Product, int> carrito, double total) async {
-    final doc = pw.Document();
+    // -----------------------------------------------------------------
+    // PASO 1: Preparar datos
+    // -----------------------------------------------------------------
     final currency = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
     final fecha = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
+    final fechaNombre = DateFormat('ddMMyyyy_HHmm').format(DateTime.now());
+
+    // -----------------------------------------------------------------
+    // [FUTURO] ZONA DE IMPRESIÓN TÉRMICA (ESC/POS)
+    // -----------------------------------------------------------------
+    /* NOTA PARA DESARROLLO FUTURO:
+       Si decides implementar una impresora Bluetooth (tipo 58mm o 80mm), 
+       aquí deberías inyectar la lógica usando librerías como:
+       - 'print_bluetooth_thermal'
+       - 'esc_pos_utils'
+       
+       La lógica sería algo así:
+       if (modoImpresoraTermicaActivo) {
+          await BluetoothPrinter.connect();
+          await BluetoothPrinter.printText("INKTRACK");
+          await BluetoothPrinter.printText("Total: $total");
+          return; // Y terminamos aquí sin generar PDF
+       }
+    */
+
+    // -----------------------------------------------------------------
+    // PASO 2: Generación de PDF (Lógica Actual)
+    // -----------------------------------------------------------------
+    final doc = pw.Document();
 
     doc.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.roll80, // Formato tipo Ticket de compra
+        pageFormat: PdfPageFormat.roll80, // Formato Rollo 80mm (Estándar supermercado)
         build: (pw.Context context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -57,19 +85,25 @@ class PdfGenerator {
       ),
     );
 
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => doc.save(),
-      name: 'Recibo_InkTrack_$fecha',
+    // -----------------------------------------------------------------
+    // PASO 3: Compartir Archivo
+    // -----------------------------------------------------------------
+    // Usamos sharePdf para abrir directamente WhatsApp, Gmail, etc.
+    await Printing.sharePdf(
+        bytes: await doc.save(),
+        filename: 'Recibo_InkTrack_$fechaNombre.pdf'
     );
   }
 
-  // -----------------------------------------------------------------
-  // 2. GENERAR REPORTE DE FINANZAS (Hoja Carta)
-  // -----------------------------------------------------------------
+  // =================================================================
+  //  SECCIÓN DE REPORTES (FINANZAS)
+  // =================================================================
+
   static Future<void> generateFinanceReport(List<AppTransaction> transacciones) async {
     final doc = pw.Document();
     final currency = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
     final fecha = DateFormat('dd/MM/yyyy').format(DateTime.now());
+    final fechaNombre = DateFormat('dd-MM-yyyy').format(DateTime.now());
 
     // Calculamos totales
     double ingresos = 0;
@@ -85,7 +119,7 @@ class PdfGenerator {
 
     doc.addPage(
       pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
+        pageFormat: PdfPageFormat.a4, // Hoja Carta Normal
         margin: const pw.EdgeInsets.all(32),
         build: (pw.Context context) {
           return [
@@ -117,7 +151,7 @@ class PdfGenerator {
               headers: ['Fecha', 'Tipo', 'Descripción', 'Monto'],
               data: transacciones.map((t) => [
                 DateFormat('dd/MM/yy').format(t.fecha),
-                t.tipo.name.toUpperCase(),
+                t.tipo.toString().split('.').last.toUpperCase(),
                 t.descripcion,
                 currency.format(t.monto)
               ]).toList(),
@@ -137,9 +171,10 @@ class PdfGenerator {
       ),
     );
 
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => doc.save(),
-      name: 'Reporte_Financiero_$fecha',
+    // Compartir directo
+    await Printing.sharePdf(
+        bytes: await doc.save(),
+        filename: 'Reporte_Financiero_$fechaNombre.pdf'
     );
   }
 
