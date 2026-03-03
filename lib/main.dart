@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'presentation/screens/main_layout.dart';
-import 'presentation/providers/theme_provider.dart'; // Importamos el proveedor del tema
+import 'presentation/providers/theme_provider.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('es_CO', null);
   runApp(const ProviderScope(child: InkTrackApp()));
 }
 
@@ -13,24 +15,26 @@ class InkTrackApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Escuchamos el estado actual del tema
     final themeMode = ref.watch(themeProvider);
 
     return MaterialApp(
       title: 'InkTrack',
       debugShowCheckedModeBanner: false,
-      themeMode: themeMode, // ¡Aquí aplicamos la magia de Riverpod!
+      themeMode: themeMode,
 
-      // Tema Claro
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueAccent, brightness: Brightness.light),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal, brightness: Brightness.light),
         useMaterial3: true,
+        fontFamily: 'Roboto',
         appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
+        cardTheme: CardThemeData(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        ),
       ),
 
-      // Tema Oscuro
       darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueAccent, brightness: Brightness.dark),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal, brightness: Brightness.dark),
         useMaterial3: true,
         appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
       ),

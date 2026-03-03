@@ -13,6 +13,7 @@ class ProveedoresScreen extends ConsumerWidget {
     final state = ref.watch(proveedoresProvider);
 
     return Scaffold(
+      backgroundColor: Colors.grey[50], // Fondo suave para resaltar las tarjetas
       appBar: AppBar(
         centerTitle: true,
         leading: Padding(
@@ -20,23 +21,33 @@ class ProveedoresScreen extends ConsumerWidget {
           child: Image.asset('assets/images/logo.png'),
         ),
         title: const Text('Proveedores', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        elevation: 0,
       ),
       body: state.when(
         data: (list) => list.isEmpty
-            ? const Center(child: Text('No hay proveedores registrados.'))
+            ? const Center(child: Text('No hay proveedores registrados.', style: TextStyle(color: Colors.grey)))
             : ListView.builder(
+          padding: const EdgeInsets.all(16),
           itemCount: list.length,
           itemBuilder: (_, i) {
             final p = list[i];
             return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              margin: const EdgeInsets.only(bottom: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              elevation: 2,
               child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Colors.purple.shade100,
-                  child: const Icon(Icons.local_shipping, color: Colors.purple),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: Colors.purple.shade50, borderRadius: BorderRadius.circular(10)),
+                  child: Icon(Icons.local_shipping, color: Colors.purple.shade700),
                 ),
-                title: Text(p.empresa, style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('${p.nombre}\n${p.contacto}'),
+                title: Text(p.empresa, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 5.0),
+                  child: Text('${p.nombre}\n${p.contacto}', style: TextStyle(color: Colors.grey[700], fontSize: 13)),
+                ),
                 isThreeLine: true,
                 trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -58,8 +69,10 @@ class ProveedoresScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
       ),
-      floatingActionButton: FloatingActionButton(
-          child: const Icon(Icons.add),
+      floatingActionButton: FloatingActionButton.extended(
+          icon: const Icon(Icons.add),
+          label: const Text('Nuevo Proveedor'),
+          backgroundColor: Colors.purple,
           onPressed: () => _modal(context, ref)
       ),
     );
@@ -81,47 +94,62 @@ class ProveedoresScreen extends ConsumerWidget {
       if (partes.length > 1) correo = partes[1];
     }
 
-    // Variable de estado para controlar la validación (Patrón Lazy Validation)
     AutovalidateMode autovalidateMode = AutovalidateMode.disabled;
+
+    // ESTILO ALTO CONTRASTE (NEGRO Y GRUESO)
+    InputDecoration inputDecoration(String label, IconData icon) {
+      return InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+        prefixIcon: Icon(icon, color: Colors.black87),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.black, width: 1.5)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.black, width: 1.5)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.black, width: 2.5)),
+        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.red, width: 1.5)),
+      );
+    }
 
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
-        // StatefulBuilder permite actualizar SOLO el diálogo sin redibujar toda la pantalla
         return StatefulBuilder(
             builder: (context, setModalState) {
               return AlertDialog(
-                title: Text(esEdicion ? 'Editar Proveedor' : 'Nuevo Proveedor'),
+                backgroundColor: Colors.white, // Aseguramos fondo blanco del diálogo
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                title: Text(esEdicion ? 'Editar Proveedor' : 'Nuevo Proveedor', style: const TextStyle(fontWeight: FontWeight.bold)),
                 content: SingleChildScrollView(
                   child: Form(
                     key: formKey,
-                    // AQUI EL CAMBIO CLAVE: Usamos la variable dinámica
                     autovalidateMode: autovalidateMode,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         TextFormField(
                           initialValue: empresa,
-                          decoration: const InputDecoration(labelText: 'Nombre de la Empresa *', prefixIcon: Icon(Icons.business)),
+                          decoration: inputDecoration('Nombre de la Empresa *', Icons.business),
                           textCapitalization: TextCapitalization.words,
                           validator: (val) => (val == null || val.trim().isEmpty) ? 'Requerido' : null,
                           onSaved: (val) => empresa = val!.trim(),
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 15),
 
                         TextFormField(
                           initialValue: nombre,
-                          decoration: const InputDecoration(labelText: 'Nombre del Encargado *', prefixIcon: Icon(Icons.person)),
+                          decoration: inputDecoration('Nombre del Encargado *', Icons.person),
                           textCapitalization: TextCapitalization.words,
                           validator: (val) => (val == null || val.trim().isEmpty) ? 'Requerido' : null,
                           onSaved: (val) => nombre = val!.trim(),
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 15),
 
                         TextFormField(
                           initialValue: telefono,
-                          decoration: const InputDecoration(labelText: 'Teléfono *', prefixIcon: Icon(Icons.phone)),
+                          decoration: inputDecoration('Teléfono *', Icons.phone),
                           keyboardType: TextInputType.phone,
                           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                           validator: (val) {
@@ -131,21 +159,17 @@ class ProveedoresScreen extends ConsumerWidget {
                           },
                           onSaved: (val) => telefono = val!.trim(),
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 15),
 
                         TextFormField(
                           initialValue: correo,
-                          decoration: const InputDecoration(
-                              labelText: 'Correo (Opcional)',
-                              prefixIcon: Icon(Icons.email),
-                              hintText: 'ejemplo@correo.com'
-                          ),
+                          decoration: inputDecoration('Correo (Opcional)', Icons.email).copyWith(hintText: 'ejemplo@correo.com'),
                           keyboardType: TextInputType.emailAddress,
                           validator: (val) {
                             if (val != null && val.isNotEmpty) {
                               final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
                               if (!emailRegex.hasMatch(val)) {
-                                return 'Correo inválido (falta @ o .)';
+                                return 'Correo inválido';
                               }
                             }
                             return null;
@@ -159,9 +183,9 @@ class ProveedoresScreen extends ConsumerWidget {
                 actions: [
                   TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
                   ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white),
                       onPressed: () {
                         if (formKey.currentState!.validate()) {
-                          // SI TODO ESTÁ BIEN
                           formKey.currentState!.save();
                           String contactoFinal = telefono;
                           if (correo.isNotEmpty) contactoFinal += ' | $correo';
@@ -179,7 +203,6 @@ class ProveedoresScreen extends ConsumerWidget {
 
                           Navigator.pop(ctx);
                         } else {
-                          // SI HAY ERRORES: Activamos el modo rojo
                           setModalState(() {
                             autovalidateMode = AutovalidateMode.onUserInteraction;
                           });
