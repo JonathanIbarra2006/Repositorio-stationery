@@ -3,11 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
-import '../../core/utils/pdf_generator.dart';
+
+// Modelos y Providers
 import '../../domain/models/product.dart';
 import '../../domain/models/transaction.dart';
 import '../providers/product_provider.dart';
 import '../providers/transaction_provider.dart';
+import '../../core/utils/pdf_generator.dart'; // Asegúrate de tener este import para los recibos
 
 class VentaDeContadoScreen extends ConsumerStatefulWidget {
   const VentaDeContadoScreen({super.key});
@@ -17,13 +19,15 @@ class VentaDeContadoScreen extends ConsumerStatefulWidget {
 }
 
 class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
+  // Estado del carrito
   final Map<Product, int> _carrito = {};
   Product? _productoSeleccionado;
   final TextEditingController _cantidadCtrl = TextEditingController(text: '1');
 
-  // NUEVA VARIABLE: Para controlar el estado de carga y evitar el pantallazo rojo
+  // Control de UI
   bool _procesando = false;
 
+  // Cálculos
   double get _totalVenta {
     double total = 0;
     _carrito.forEach((p, c) => total += p.precio * c);
@@ -31,77 +35,193 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
   }
 
   @override
+  void dispose() {
+    _cantidadCtrl.dispose();
+    super.dispose();
+  }
+
+  // Métodos de ayuda para incrementar/decrementar
+  void _incrementarCantidad() {
+    int actual = int.tryParse(_cantidadCtrl.text) ?? 1;
+    if (_productoSeleccionado != null) {
+      if (actual < _productoSeleccionado!.stock) {
+        setState(() => _cantidadCtrl.text = (actual + 1).toString());
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No puedes superar el stock disponible'), duration: Duration(milliseconds: 500))
+        );
+      }
+    } else {
+      setState(() => _cantidadCtrl.text = (actual + 1).toString());
+    }
+  }
+
+  void _decrementarCantidad() {
+    int actual = int.tryParse(_cantidadCtrl.text) ?? 1;
+    if (actual > 1) {
+      setState(() => _cantidadCtrl.text = (actual - 1).toString());
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final currency = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
     final productsAsync = ref.watch(productsProvider);
+    final currency = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+
+    // --- MODO OSCURO / ESTILOS ---
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF121212) : Colors.grey[100];
+    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final subTextColor = isDark ? Colors.grey[400] : Colors.grey[600];
+    // Input styles
+    final inputFillColor = isDark ? const Color(0xFF2C2C2C) : Colors.white;
+    final borderColor = isDark ? Colors.grey.shade600 : Colors.black; // Alto contraste en light
+
+    InputDecoration inputDecoration(String label) {
+      return InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+        filled: true,
+        fillColor: inputFillColor,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: borderColor)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: borderColor)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? Colors.tealAccent : Colors.teal, width: 2)),
+      );
+    }
 
     return Scaffold(
+      backgroundColor: bgColor,
       appBar: AppBar(
-        title: const Text('Venta de Contado', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.teal,
-        foregroundColor: Colors.white,
+        title: Text('Nueva Venta', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+        centerTitle: true,
+        backgroundColor: cardColor,
+        foregroundColor: textColor,
+        elevation: 0,
+        actions: [
+          if (_carrito.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.delete_sweep, color: Colors.redAccent),
+              tooltip: 'Limpiar Carrito',
+              onPressed: _procesando ? null : () => setState(() => _carrito.clear()),
+            )
+        ],
       ),
-      // USAMOS UN STACK: Permite poner cosas una encima de otra (Formulario al fondo, Cargando encima)
       body: Stack(
         children: [
-          // 1. EL CONTENIDO NORMAL DE LA PANTALLA
           Column(
             children: [
-              // ZONA DE SELECCIÓN
+              // 1. ZONA DE SELECCIÓN (Panel Superior)
               Container(
-                padding: const EdgeInsets.all(16.0),
-                color: Colors.grey[50],
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5))]
+                ),
                 child: productsAsync.when(
                   loading: () => const LinearProgressIndicator(),
-                  error: (e, _) => const Text('Error cargando inventario'),
+                  error: (e, _) => Text('Error cargando inventario', style: TextStyle(color: Colors.red)),
                   data: (productos) {
+                    // Filtramos productos con stock > 0
                     final productosDisponibles = productos.where((p) => p.stock > 0).toList();
 
-                    return Row(
+                    // Ordenar alfabéticamente
+                    productosDisponibles.sort((a, b) => a.nombre.compareTo(b.nombre));
+
+                    return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          flex: 3,
-                          child: DropdownButtonFormField<Product>(
-                            decoration: const InputDecoration(
-                                labelText: 'Seleccionar Producto',
-                                border: OutlineInputBorder(),
-                                filled: true,
-                                fillColor: Colors.white,
-                                prefixIcon: Icon(Icons.search)
+                        Text('Agregar Producto', style: TextStyle(color: subTextColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            // DROPDOWN DE PRODUCTOS
+                            Expanded(
+                              flex: 3,
+                              child: DropdownButtonFormField<Product>(
+                                decoration: inputDecoration('Seleccionar...').copyWith(
+                                    prefixIcon: Icon(Icons.search, color: subTextColor)
+                                ),
+                                dropdownColor: cardColor,
+                                isExpanded: true,
+                                value: _productoSeleccionado,
+                                icon: Icon(Icons.arrow_drop_down, color: textColor),
+                                style: TextStyle(color: textColor, fontSize: 16),
+                                // Bloqueamos si procesa
+                                onChanged: _procesando ? null : (val) {
+                                  setState(() {
+                                    _productoSeleccionado = val;
+                                    _cantidadCtrl.text = '1'; // Reiniciar cantidad al cambiar
+                                  });
+                                },
+                                items: productosDisponibles.map((p) => DropdownMenuItem(
+                                  value: p,
+                                  child: Text(
+                                      '${p.nombre}  —  Stock: ${p.stock}',
+                                      style: TextStyle(color: textColor),
+                                      overflow: TextOverflow.ellipsis
+                                  ),
+                                )).toList(),
+                              ),
                             ),
-                            isExpanded: true,
-                            value: _productoSeleccionado,
-                            // FIX IMPORTANTE: Si estamos procesando, desactivamos el dropdown para evitar el error
-                            onChanged: _procesando ? null : (val) => setState(() => _productoSeleccionado = val),
-                            items: productosDisponibles.map((p) => DropdownMenuItem(
-                              value: p,
-                              child: Text('${p.nombre} (${p.stock}) - ${currency.format(p.precio)}', overflow: TextOverflow.ellipsis),
-                            )).toList(),
-                          ),
+                          ],
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          flex: 1,
-                          child: TextFormField(
-                            controller: _cantidadCtrl,
-                            enabled: !_procesando, // Desactivar si procesa
-                            decoration: const InputDecoration(
-                                labelText: 'Cant.',
-                                border: OutlineInputBorder(),
-                                filled: true,
-                                fillColor: Colors.white
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            // CONTROLES DE CANTIDAD
+                            Container(
+                              decoration: BoxDecoration(
+                                  color: isDark ? Colors.black26 : Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: borderColor, width: 1) // Borde acorde al tema
+                              ),
+                              child: Row(
+                                children: [
+                                  IconButton(
+                                    icon: Icon(Icons.remove, color: Colors.red.shade300),
+                                    onPressed: _procesando ? null : _decrementarCantidad,
+                                  ),
+                                  SizedBox(
+                                    width: 50,
+                                    child: TextField(
+                                      controller: _cantidadCtrl,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 18),
+                                      keyboardType: TextInputType.number,
+                                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                      decoration: const InputDecoration(border: InputBorder.none),
+                                      enabled: !_procesando,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.add, color: Colors.teal),
+                                    onPressed: _procesando ? null : _incrementarCantidad,
+                                  ),
+                                ],
+                              ),
                             ),
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                        const SizedBox(width: 5),
-                        IconButton.filled(
-                          style: IconButton.styleFrom(backgroundColor: Colors.teal, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                          icon: const Icon(Icons.add_shopping_cart),
-                          onPressed: _procesando ? null : _agregarAlCarrito,
+                            const SizedBox(width: 10),
+                            // BOTÓN AGREGAR (Grande y llamativo)
+                            Expanded(
+                              child: SizedBox(
+                                height: 50,
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.teal,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      elevation: 2
+                                  ),
+                                  icon: const Icon(Icons.add_shopping_cart),
+                                  label: const Text('AGREGAR', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  onPressed: (_procesando || _productoSeleccionado == null) ? null : _agregarAlCarrito,
+                                ),
+                              ),
+                            )
+                          ],
                         )
                       ],
                     );
@@ -109,47 +229,49 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
                 ),
               ),
 
-              const Divider(height: 1),
-
-              // LISTA DEL CARRITO
+              // 2. LISTA DEL CARRITO
               Expanded(
                 child: _carrito.isEmpty
                     ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.point_of_sale, size: 80, color: Colors.grey[300]),
+                      Icon(Icons.shopping_cart_outlined, size: 80, color: Colors.grey.withValues(alpha: 0.3)),
                       const SizedBox(height: 10),
-                      Text('Carrito Vacío', style: TextStyle(color: Colors.grey[400], fontSize: 18)),
+                      Text('El carrito está vacío', style: TextStyle(color: subTextColor, fontSize: 18)),
                     ],
                   ),
                 )
                     : ListView.builder(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(16),
                   itemCount: _carrito.length,
                   itemBuilder: (ctx, i) {
                     final p = _carrito.keys.elementAt(i);
                     final cant = _carrito[p]!;
                     return Card(
+                      color: cardColor,
                       elevation: 2,
-                      margin: const EdgeInsets.symmetric(vertical: 5),
+                      margin: const EdgeInsets.only(bottom: 10),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: Colors.teal.shade100,
-                          foregroundColor: Colors.teal[800],
-                          child: Text('$cant', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          backgroundColor: Colors.teal.withValues(alpha: 0.2),
+                          child: Text('$cant', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
                         ),
-                        title: Text(p.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Unitario: ${currency.format(p.precio)}'),
+                        title: Text(p.nombre, style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                        subtitle: Text(
+                            '${currency.format(p.precio)} c/u',
+                            style: TextStyle(color: subTextColor)
+                        ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               currency.format(p.precio * cant),
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.teal),
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textColor),
                             ),
+                            const SizedBox(width: 10),
                             IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
+                              icon: const Icon(Icons.delete_outline, color: Colors.red),
                               onPressed: _procesando ? null : () => setState(() => _carrito.remove(p)),
                             )
                           ],
@@ -160,63 +282,70 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
                 ),
               ),
 
-              // ZONA TOTAL
+              // 3. ZONA DE PAGO (Bottom Bar)
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: const Offset(0, -5))],
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20))
+                    color: cardColor,
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, -5))],
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(25))
                 ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('TOTAL VENTA:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
-                        Text(currency.format(_totalVenta), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.teal)),
-                      ],
-                    ),
-                    const SizedBox(height: 15),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 55,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal,
-                            foregroundColor: Colors.white,
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
-                        ),
-                        icon: const Icon(Icons.check_circle, size: 28),
-                        label: const Text('COBRAR Y REGISTRAR', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                        // Desactivamos el botón si ya está procesando
-                        onPressed: (_carrito.isEmpty || _procesando) ? null : _procesarVenta,
+                child: SafeArea( // Para proteger en iPhones con notch
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('TOTAL A PAGAR:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: subTextColor)),
+                          Text(currency.format(_totalVenta), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Colors.teal)),
+                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 15),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 55,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: _carrito.isEmpty ? Colors.grey : Colors.teal,
+                              foregroundColor: Colors.white,
+                              elevation: 5,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
+                          ),
+                          onPressed: (_carrito.isEmpty || _procesando) ? null : _procesarVenta,
+                          child: _procesando
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.check_circle_outline, size: 28),
+                              SizedBox(width: 10),
+                              Text('COBRAR VENTA', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
 
-          // 2. CAPA DE BLOQUEO (LOADING) - ESTO EVITA EL ERROR ROJO
+          // 4. OVERLAY DE CARGA (Para evitar errores y toques accidentales)
           if (_procesando)
             Container(
-              color: Colors.black.withValues(alpha: 0.5), // Fondo oscurecido
+              color: Colors.black.withValues(alpha: 0.5),
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(15)
-                  ),
-                  child: const Column(
+                  padding: const EdgeInsets.all(25),
+                  decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(20)),
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      CircularProgressIndicator(color: Colors.teal),
-                      SizedBox(height: 15),
-                      Text("Procesando Venta...", style: TextStyle(fontWeight: FontWeight.bold))
+                      const CircularProgressIndicator(color: Colors.teal),
+                      const SizedBox(height: 20),
+                      Text("Procesando...", style: TextStyle(fontWeight: FontWeight.bold, color: textColor))
                     ],
                   ),
                 ),
@@ -227,43 +356,59 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
     );
   }
 
+  // Lógica de Agregar al Carrito (Con Validación de Stock)
   void _agregarAlCarrito() {
     if (_productoSeleccionado == null) return;
-    final int cantidad = int.tryParse(_cantidadCtrl.text) ?? 1;
-    if (cantidad <= 0) return;
+    final int cantidadInput = int.tryParse(_cantidadCtrl.text) ?? 1;
+    if (cantidadInput <= 0) return;
 
-    final enCarrito = _carrito[_productoSeleccionado] ?? 0;
-    if ((enCarrito + cantidad) > _productoSeleccionado!.stock) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Stock insuficiente. Solo quedan ${_productoSeleccionado!.stock}'), backgroundColor: Colors.red));
+    // Verificar si ya está en el carrito para sumar
+    final cantidadEnCarrito = _carrito[_productoSeleccionado] ?? 0;
+    final stockDisponible = _productoSeleccionado!.stock;
+
+    if ((cantidadEnCarrito + cantidadInput) > stockDisponible) {
+      _mostrarError('Stock insuficiente. Disponible: $stockDisponible');
       return;
     }
 
     setState(() {
       if (_carrito.containsKey(_productoSeleccionado)) {
-        _carrito[_productoSeleccionado!] = _carrito[_productoSeleccionado!]! + cantidad;
+        _carrito[_productoSeleccionado!] = _carrito[_productoSeleccionado!]! + cantidadInput;
       } else {
-        _carrito[_productoSeleccionado!] = cantidad;
+        _carrito[_productoSeleccionado!] = cantidadInput;
       }
+      // Feedback visual opcional
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Agregado: ${_productoSeleccionado!.nombre}'),
+        duration: const Duration(milliseconds: 500),
+        backgroundColor: Colors.teal,
+      ));
+
+      // Resetear input
       _cantidadCtrl.text = '1';
     });
   }
 
+  // Lógica de Procesar Venta
   Future<void> _procesarVenta() async {
+    // Bloquear UI
     setState(() {
       _procesando = true;
-      _productoSeleccionado = null;
+      _productoSeleccionado = null; // Evitar conflictos de dropdown
     });
 
-    // Guardamos una COPIA del carrito para el recibo antes de borrarlo
+    // Guardar copia para recibo
     final carritoParaRecibo = Map<Product, int>.from(_carrito);
     final totalParaRecibo = _totalVenta;
 
-    await Future.delayed(const Duration(milliseconds: 100));
+    await Future.delayed(const Duration(milliseconds: 300)); // Pequeña pausa para UX
 
     try {
+      final fecha = DateTime.now();
       final descripcionVenta = _carrito.entries.map((e) => "${e.value}x ${e.key.nombre}").join(", ");
 
-      // A. Descontar Inventario
+      // 1. Descontar Inventario
       for (var entry in _carrito.entries) {
         final producto = entry.key;
         final cantidadVendida = entry.value;
@@ -271,12 +416,12 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
         await ref.read(productsProvider.notifier).editProduct(nuevoProducto);
       }
 
-      // B. Registrar en Caja
+      // 2. Registrar Transacción
       final nuevaTransaccion = AppTransaction(
           id: const Uuid().v4(),
           tipo: TransactionType.ingreso,
           monto: _totalVenta,
-          fecha: DateTime.now(),
+          fecha: fecha,
           descripcion: 'Venta Contado: $descripcionVenta',
           categoria: 'Ventas Mostrador'
       );
@@ -284,36 +429,34 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
       await ref.read(transactionsProvider.notifier).addTransaction(nuevaTransaccion);
 
       if (mounted) {
-        // C. ÉXITO Y PREGUNTA POR RECIBO
-        setState(() => _procesando = false); // Quitamos el bloqueo
+        setState(() => _procesando = false);
 
+        // 3. Diálogo de Éxito / Recibo
         await showDialog(
           context: context,
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
-            title: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 10), Text('Venta Exitosa')]),
-            content: const Text('¿Deseas generar el recibo para compartir?'),
+            backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(children: [Icon(Icons.check_circle, color: Colors.green, size: 30), SizedBox(width: 10), Text('Venta Exitosa')]),
+            content: const Text('¿Deseas generar el recibo?'),
             actions: [
               TextButton(
                 onPressed: () {
                   Navigator.pop(ctx); // Cierra diálogo
-                  Navigator.pop(context); // Cierra pantalla de venta
+                  Navigator.pop(context); // Cierra pantalla
                 },
                 child: const Text('No, Salir'),
               ),
               ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
                 icon: const Icon(Icons.print),
                 label: const Text('Ver Recibo'),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
                 onPressed: () {
-                  Navigator.pop(ctx); // Cierra diálogo
-                  // Generamos el PDF
+                  Navigator.pop(ctx);
                   PdfGenerator.generateReceipt(carritoParaRecibo, totalParaRecibo);
-                  // Limpiamos carrito y UI
-                  setState(() {
-                    _carrito.clear();
-                    _cantidadCtrl.text = '1';
-                  });
+                  // Limpiar y resetear
+                  setState(() => _carrito.clear());
                 },
               ),
             ],
@@ -324,8 +467,16 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _procesando = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+        _mostrarError('Error procesando venta: $e');
       }
     }
+  }
+
+  void _mostrarError(String mensaje) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(mensaje),
+      backgroundColor: Colors.red,
+      behavior: SnackBarBehavior.floating,
+    ));
   }
 }
