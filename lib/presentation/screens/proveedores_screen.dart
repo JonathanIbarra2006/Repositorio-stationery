@@ -97,7 +97,7 @@ class ProveedoresScreen extends ConsumerWidget {
     String correo = '';
 
     if (esEdicion) {
-      final partes = prov!.contacto.split(' | ');
+      final partes = prov.contacto.split(' | ');
       telefono = partes[0];
       if (partes.length > 1) correo = partes[1];
     }
@@ -213,7 +213,7 @@ class ProveedoresScreen extends ConsumerWidget {
                 String contacto = telefono;
                 if (correo.isNotEmpty) contacto += ' | $correo';
                 final nuevo = Proveedor(
-                    id: esEdicion ? prov!.id : const Uuid().v4(),
+                    id: esEdicion ? prov.id : const Uuid().v4(),
                     nombre: nombre,
                     contacto: contacto,
                     empresa: empresa);

@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../domain/models/cliente_fiado.dart';
 import '../../domain/models/transaction.dart';
