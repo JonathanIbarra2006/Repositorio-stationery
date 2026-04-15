@@ -9,7 +9,10 @@ import '../../domain/models/product.dart';
 import '../../domain/models/transaction.dart';
 import '../providers/product_provider.dart';
 import '../providers/transaction_provider.dart';
-import '../../core/utils/pdf_generator.dart'; // Asegúrate de tener este import para los recibos
+import '../providers/fiado_provider.dart';
+import '../theme/app_colors.dart';
+import '../../core/utils/pdf_generator.dart';
+
 
 class VentaDeContadoScreen extends ConsumerStatefulWidget {
   const VentaDeContadoScreen({super.key});
@@ -26,6 +29,10 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
 
   // Control de UI
   bool _procesando = false;
+
+  // ── Venta a crédito (fiado) ──────────────────────────────────────────
+  bool _esFiado = false;
+  String? _clienteIdParaFiado;
 
   // Cálculos
   double get _totalVenta {
@@ -290,24 +297,73 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
                     boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, -5))],
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(25))
                 ),
-                child: SafeArea( // Para proteger en iPhones con notch
+                child: SafeArea(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // ── Total ──────────────────────────────────────────
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('TOTAL A PAGAR:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: subTextColor)),
-                          Text(currency.format(_totalVenta), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Colors.teal)),
+                          Text('TOTAL:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: subTextColor)),
+                          Text(currency.format(_totalVenta), style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: _esFiado ? kAccent : Colors.teal)),
                         ],
                       ),
-                      const SizedBox(height: 15),
+                      const SizedBox(height: 12),
+
+                      // ── Toggle Fiado ────────────────────────────────────
+                      Container(
+                        decoration: BoxDecoration(
+                          color: _esFiado ? kAccent.withValues(alpha: 0.08) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _esFiado ? kAccent.withValues(alpha: 0.4) : Colors.grey.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: SwitchListTile(
+                          dense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                          title: Text(
+                            '¿Venta a crédito (Fiado)?',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: _esFiado ? kAccent : textColor,
+                            ),
+                          ),
+                          subtitle: Text(
+                            _esFiado ? 'Se registrará en la cartera del cliente' : 'La venta se registrará como ingreso',
+                            style: TextStyle(fontSize: 11, color: subTextColor),
+                          ),
+                          secondary: Icon(
+                            _esFiado ? Icons.credit_card : Icons.payments_outlined,
+                            color: _esFiado ? kAccent : subTextColor,
+                          ),
+                          value: _esFiado,
+                          activeColor: kAccent,
+                          onChanged: _procesando
+                              ? null
+                              : (v) => setState(() {
+                                    _esFiado = v;
+                                    _clienteIdParaFiado = null;
+                                  }),
+                        ),
+                      ),
+
+                      // ── Selector de cliente (si es fiado) ────────────────
+                      if (_esFiado) ...[const SizedBox(height: 10), _buildClientSelector(ref, textColor, subTextColor, cardColor)],
+
+                      const SizedBox(height: 14),
+
+                      // ── Botón cobrar ────────────────────────────────────
                       SizedBox(
                         width: double.infinity,
                         height: 55,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                              backgroundColor: _carrito.isEmpty ? Colors.grey : Colors.teal,
+                              backgroundColor: _carrito.isEmpty
+                                  ? Colors.grey
+                                  : (_esFiado ? kAccent : Colors.teal),
                               foregroundColor: Colors.white,
                               elevation: 5,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
@@ -315,12 +371,15 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
                           onPressed: (_carrito.isEmpty || _procesando) ? null : _procesarVenta,
                           child: _procesando
                               ? const CircularProgressIndicator(color: Colors.white)
-                              : const Row(
+                              : Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.check_circle_outline, size: 28),
-                              SizedBox(width: 10),
-                              Text('COBRAR VENTA', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                              Icon(_esFiado ? Icons.credit_card : Icons.check_circle_outline, size: 26),
+                              const SizedBox(width: 10),
+                              Text(
+                                _esFiado ? 'REGISTRAR FIADO' : 'COBRAR VENTA',
+                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
                             ],
                           ),
                         ),
@@ -390,80 +449,183 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
     });
   }
 
-  // Lógica de Procesar Venta
+  // ── Selector de cliente ────────────────────────────────────────────────
+  Widget _buildClientSelector(
+      WidgetRef ref, Color textColor, Color? subColor, Color cardColor) {
+    final clientesAsync = ref.watch(clientesProvider);
+
+    return clientesAsync.when(
+      loading: () => const LinearProgressIndicator(color: kAccent),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (clientes) {
+        if (clientes.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: kAccent.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: kAccent.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, color: kAccent, size: 20),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'No hay clientes registrados.',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(foregroundColor: kAccent),
+                  child: const Text('Ir a Clientes',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return DropdownButtonFormField<String>(
+          value: _clienteIdParaFiado,
+          dropdownColor: cardColor,
+          style: TextStyle(color: textColor),
+          decoration: InputDecoration(
+            labelText: 'Seleccionar cliente *',
+            labelStyle: TextStyle(color: textColor),
+            prefixIcon: const Icon(Icons.person_outline, color: kAccent),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          hint: Text('Selecciona un cliente',
+              style: TextStyle(color: subColor)),
+          isExpanded: true,
+          items: clientes
+              .map((c) => DropdownMenuItem(
+                    value: c.id,
+                    child: Text(c.nombre, style: TextStyle(color: textColor)),
+                  ))
+              .toList(),
+          onChanged: (v) => setState(() => _clienteIdParaFiado = v),
+        );
+      },
+    );
+  }
+
+  // ── Procesar Venta ────────────────────────────────────────────────────
   Future<void> _procesarVenta() async {
-    // Bloquear UI
+    // Validar cliente si es fiado
+    if (_esFiado && _clienteIdParaFiado == null) {
+      _mostrarError('Selecciona un cliente para el fiado');
+      return;
+    }
+
     setState(() {
       _procesando = true;
-      _productoSeleccionado = null; // Evitar conflictos de dropdown
+      _productoSeleccionado = null;
     });
 
-    // Guardar copia para recibo
     final carritoParaRecibo = Map<Product, int>.from(_carrito);
     final totalParaRecibo = _totalVenta;
 
-    await Future.delayed(const Duration(milliseconds: 300)); // Pequeña pausa para UX
+    await Future.delayed(const Duration(milliseconds: 300));
 
     try {
-      final fecha = DateTime.now();
-      final descripcionVenta = _carrito.entries.map((e) => "${e.value}x ${e.key.nombre}").join(", ");
+      if (_esFiado) {
+        // ── Venta a crédito: registrarFiado maneja stock + deuda ────────
+        await ref.read(clientesProvider.notifier).registrarFiado(
+              clienteIdExistente: _clienteIdParaFiado,
+              carrito: _carrito,
+              totalDeuda: _totalVenta,
+            );
+        ref.invalidate(productsProvider);
 
-      // 1. Descontar Inventario
-      for (var entry in _carrito.entries) {
-        final producto = entry.key;
-        final cantidadVendida = entry.value;
-        final nuevoProducto = producto.copyWith(stock: producto.stock - cantidadVendida);
-        await ref.read(productsProvider.notifier).editProduct(nuevoProducto);
+        if (mounted) {
+          setState(() {
+            _procesando = false;
+            _carrito.clear();
+            _esFiado = false;
+            _clienteIdParaFiado = null;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Row(children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Fiado registrado en cartera del cliente'),
+            ]),
+            backgroundColor: kAccent,
+            behavior: SnackBarBehavior.floating,
+          ));
+          Navigator.pop(context);
+        }
+      } else {
+        // ── Venta de contado ─────────────────────────────────────────────
+        final fecha = DateTime.now();
+        final descripcionVenta =
+            _carrito.entries.map((e) => '${e.value}x ${e.key.nombre}').join(', ');
+
+        for (var entry in _carrito.entries) {
+          final nuevoProducto =
+              entry.key.copyWith(stock: entry.key.stock - entry.value);
+          await ref.read(productsProvider.notifier).editProduct(nuevoProducto);
+        }
+
+        final nuevaTransaccion = AppTransaction(
+            id: const Uuid().v4(),
+            tipo: TransactionType.ingreso,
+            monto: _totalVenta,
+            fecha: fecha,
+            descripcion: 'Venta Contado: $descripcionVenta',
+            categoria: 'Ventas Mostrador');
+
+        await ref.read(transactionsProvider.notifier).addTransaction(nuevaTransaccion);
+
+        if (mounted) {
+          setState(() => _procesando = false);
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => AlertDialog(
+              backgroundColor:
+                  Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF1E1E1E)
+                      : Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              title: const Row(children: [
+                Icon(Icons.check_circle, color: Colors.green, size: 30),
+                SizedBox(width: 10),
+                Text('Venta Exitosa')
+              ]),
+              content: const Text('¿Deseas generar el recibo?'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.pop(context);
+                  },
+                  child: const Text('No, Salir'),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      foregroundColor: Colors.white),
+                  icon: const Icon(Icons.print),
+                  label: const Text('Ver Recibo'),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    PdfGenerator.generateReceipt(
+                        carritoParaRecibo, totalParaRecibo);
+                    setState(() => _carrito.clear());
+                  },
+                ),
+              ],
+            ),
+          );
+        }
       }
-
-      // 2. Registrar Transacción
-      final nuevaTransaccion = AppTransaction(
-          id: const Uuid().v4(),
-          tipo: TransactionType.ingreso,
-          monto: _totalVenta,
-          fecha: fecha,
-          descripcion: 'Venta Contado: $descripcionVenta',
-          categoria: 'Ventas Mostrador'
-      );
-
-      await ref.read(transactionsProvider.notifier).addTransaction(nuevaTransaccion);
-
-      if (mounted) {
-        setState(() => _procesando = false);
-
-        // 3. Diálogo de Éxito / Recibo
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Row(children: [Icon(Icons.check_circle, color: Colors.green, size: 30), SizedBox(width: 10), Text('Venta Exitosa')]),
-            content: const Text('¿Deseas generar el recibo?'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(ctx); // Cierra diálogo
-                  Navigator.pop(context); // Cierra pantalla
-                },
-                child: const Text('No, Salir'),
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
-                icon: const Icon(Icons.print),
-                label: const Text('Ver Recibo'),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  PdfGenerator.generateReceipt(carritoParaRecibo, totalParaRecibo);
-                  // Limpiar y resetear
-                  setState(() => _carrito.clear());
-                },
-              ),
-            ],
-          ),
-        );
-      }
-
     } catch (e) {
       if (mounted) {
         setState(() => _procesando = false);
