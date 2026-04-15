@@ -158,3 +158,46 @@ class ClientesNotifier extends StateNotifier<AsyncValue<List<Cliente>>> {
     await loadClientes();
   }
 }
+
+// ────────────────────────────────────────────────
+// ESTADÍSTICAS DE CARTERA
+// ────────────────────────────────────────────────
+class CarteraStats {
+  final int totalClientes;
+  final int clientesConDeuda;
+  final double deudaTotal;
+
+  const CarteraStats({
+    required this.totalClientes,
+    required this.clientesConDeuda,
+    required this.deudaTotal,
+  });
+}
+
+final carteraStatsProvider = FutureProvider<CarteraStats>((ref) async {
+  // Escuchar cambios en clientes para refrescar
+  ref.watch(clientesProvider);
+
+  final db = await DatabaseHelper.instance.database;
+  final clientes = await db.query('clientes');
+  final fiados = await db.query('fiados', where: "estado = 'pendiente'");
+
+  final Set<String> idsConDeuda = {};
+  double deudaTotal = 0;
+
+  for (final f in fiados) {
+    final total = (f['total'] as num).toDouble();
+    final pagado = (f['monto_pagado'] as num?)?.toDouble() ?? 0.0;
+    final saldo = total - pagado;
+    if (saldo > 0.01) {
+      idsConDeuda.add(f['cliente_id'] as String);
+      deudaTotal += saldo;
+    }
+  }
+
+  return CarteraStats(
+    totalClientes: clientes.length,
+    clientesConDeuda: idsConDeuda.length,
+    deudaTotal: deudaTotal,
+  );
+});

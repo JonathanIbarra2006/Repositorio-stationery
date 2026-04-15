@@ -4,8 +4,9 @@ class Product {
   final String categoria;
   final double precio;
   final int stock;
-  final String? codigoBarras; // Nuevo: Opcional
-  final String proveedor;     // Nuevo: Obligatorio
+  final String? codigoBarras;
+  final String proveedor;
+  final int stockMinimo; // Nivel mínimo antes de alerta
 
   Product({
     required this.id,
@@ -15,6 +16,7 @@ class Product {
     required this.stock,
     this.codigoBarras,
     required this.proveedor,
+    this.stockMinimo = 5,
   });
 
   Product copyWith({
@@ -25,6 +27,7 @@ class Product {
     int? stock,
     String? codigoBarras,
     String? proveedor,
+    int? stockMinimo,
   }) {
     return Product(
       id: id ?? this.id,
@@ -34,6 +37,7 @@ class Product {
       stock: stock ?? this.stock,
       codigoBarras: codigoBarras ?? this.codigoBarras,
       proveedor: proveedor ?? this.proveedor,
+      stockMinimo: stockMinimo ?? this.stockMinimo,
     );
   }
 
@@ -44,8 +48,9 @@ class Product {
       'categoria': categoria,
       'precio': precio,
       'stock': stock,
-      'codigo_barras': codigoBarras, // Se guarda en la BD
-      'proveedor': proveedor,        // Se guarda en la BD
+      'codigo_barras': codigoBarras,
+      'proveedor': proveedor,
+      'stock_minimo': stockMinimo,
     };
   }
 
@@ -57,7 +62,8 @@ class Product {
       precio: map['precio'],
       stock: map['stock'],
       codigoBarras: map['codigo_barras'],
-      proveedor: map['proveedor'] ?? 'Sin Proveedor', // Protección por si es null
+      proveedor: map['proveedor'] ?? 'Sin Proveedor',
+      stockMinimo: map['stock_minimo'] ?? 5,
     );
   }
 }

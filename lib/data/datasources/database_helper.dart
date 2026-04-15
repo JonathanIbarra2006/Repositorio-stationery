@@ -9,7 +9,7 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDB('inktrack_v3.db'); // Subimos versión
+    _database = await _initDB('inktrack_v3.db');
     return _database!;
   }
 
@@ -19,8 +19,9 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
   }
 
@@ -34,7 +35,8 @@ class DatabaseHelper {
         precio REAL NOT NULL,
         stock INTEGER NOT NULL,
         codigo_barras TEXT,
-        proveedor TEXT NOT NULL
+        proveedor TEXT NOT NULL,
+        stock_minimo INTEGER DEFAULT 5
       )
     ''');
 
@@ -75,13 +77,22 @@ class DatabaseHelper {
         id TEXT PRIMARY KEY,
         cliente_id TEXT NOT NULL,
         total REAL NOT NULL,
-        monto_pagado REAL DEFAULT 0, -- Nuevo campo para controlar abonos
+        monto_pagado REAL DEFAULT 0,
         fecha TEXT NOT NULL,
-        estado TEXT NOT NULL, 
+        estado TEXT NOT NULL,
         productos TEXT,
         FOREIGN KEY (cliente_id) REFERENCES clientes (id)
       )
     ''');
+  }
+
+  /// Migración de versión 1 → 2: agrega la columna stock_minimo
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute(
+        'ALTER TABLE productos ADD COLUMN stock_minimo INTEGER DEFAULT 5',
+      );
+    }
   }
 
   Future close() async {
