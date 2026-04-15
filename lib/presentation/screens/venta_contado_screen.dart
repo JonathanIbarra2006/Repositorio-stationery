@@ -153,7 +153,7 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
                                 ),
                                 dropdownColor: cardColor,
                                 isExpanded: true,
-                                value: _productoSeleccionado,
+                                initialValue: _productoSeleccionado,
                                 icon: Icon(Icons.arrow_drop_down, color: textColor),
                                 style: TextStyle(color: textColor, fontSize: 16),
                                 // Bloqueamos si procesa
@@ -340,7 +340,7 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
                             color: _esFiado ? kAccent : subTextColor,
                           ),
                           value: _esFiado,
-                          activeColor: kAccent,
+                          activeThumbColor: kAccent,
                           onChanged: _procesando
                               ? null
                               : (v) => setState(() {
@@ -456,7 +456,7 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
 
     return clientesAsync.when(
       loading: () => const LinearProgressIndicator(color: kAccent),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
       data: (clientes) {
         if (clientes.isEmpty) {
           return Container(
@@ -488,7 +488,7 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
         }
 
         return DropdownButtonFormField<String>(
-          value: _clienteIdParaFiado,
+          initialValue: _clienteIdParaFiado,
           dropdownColor: cardColor,
           style: TextStyle(color: textColor),
           decoration: InputDecoration(

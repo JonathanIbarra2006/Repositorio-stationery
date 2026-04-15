@@ -81,7 +81,7 @@ class _NuevoFiadoScreenState extends ConsumerState<NuevoFiadoScreen> {
                               filled: true,
                               fillColor: Colors.white
                           ),
-                          value: _clienteSeleccionadoId,
+                          initialValue: _clienteSeleccionadoId,
                           isExpanded: true,
                           items: [
                             // Opción especial para crear nuevo (AL PRINCIPIO PARA QUE SE VEA)
@@ -166,7 +166,7 @@ class _NuevoFiadoScreenState extends ConsumerState<NuevoFiadoScreen> {
                         flex: 7,
                         child: DropdownButtonFormField<Product>(
                           decoration: const InputDecoration(labelText: 'Producto', border: OutlineInputBorder()),
-                          value: _prodSeleccionado,
+                          initialValue: _prodSeleccionado,
                           isExpanded: true,
                           items: productos.map((p) => DropdownMenuItem(
                             value: p,

@@ -314,7 +314,7 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
             _InputCard(
               cardColor: cardColor,
               child: DropdownButtonFormField<String>(
-                value: _categoriaSeleccionada,
+                initialValue: _categoriaSeleccionada,
                 dropdownColor: cardColor,
                 style: TextStyle(color: textColor),
                 decoration: _hint('', subColor),
@@ -374,7 +374,7 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
             _InputCard(
               cardColor: cardColor,
               child: DropdownButtonFormField<String>(
-                value: listaNombres.contains(_proveedorSeleccionado)
+                initialValue: listaNombres.contains(_proveedorSeleccionado)
                     ? _proveedorSeleccionado
                     : null,
                 dropdownColor: cardColor,
@@ -475,7 +475,7 @@ class _InputCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 8,
               offset: const Offset(0, 2))
         ],

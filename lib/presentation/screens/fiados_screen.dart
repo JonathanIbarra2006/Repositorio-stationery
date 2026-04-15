@@ -42,7 +42,7 @@ class FiadosScreen extends ConsumerWidget {
                   // ── Card de cartera ─────────────────────────────────
                   statsAsync.when(
                     loading: () => const SizedBox.shrink(),
-                    error: (_, __) => const SizedBox.shrink(),
+                    error: (_, _) => const SizedBox.shrink(),
                     data: (stats) => _CarteraCard(
                       stats: stats,
                       currency: currency,

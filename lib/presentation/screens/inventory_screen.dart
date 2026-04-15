@@ -9,7 +9,6 @@ import '../../domain/models/product.dart';
 import '../providers/product_provider.dart';
 
 // Import del archivo de ventas
-import 'venta_contado_screen.dart';
 import 'nuevo_producto_screen.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
@@ -17,20 +16,11 @@ class InventoryScreen extends ConsumerStatefulWidget {
   @override
   ConsumerState<InventoryScreen> createState() => _InventoryScreenState();
 }
-
 class _InventoryScreenState extends ConsumerState<InventoryScreen> {
-  final _searchController = TextEditingController();
-  String _searchQuery = '';
-
   @override
   Widget build(BuildContext context) {
     final productsAsync = ref.watch(productsProvider);
-    final currency = NumberFormat.currency(
-      locale: 'es_CO',
-      symbol: '\$',
-      decimalDigits: 0,
-    );
-
+    
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA), // Off-white background
       body: SafeArea(
@@ -48,7 +38,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
+                    color: Colors.black.withValues(alpha: 0.02),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -177,7 +167,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             borderRadius: BorderRadius.circular(24),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.03),
+                                color: Colors.black.withValues(alpha: 0.03),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -413,7 +403,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                     borderRadius: BorderRadius.circular(20),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(0.02),
+                                        color: Colors.black.withValues(alpha: 0.02),
                                         blurRadius: 10,
                                         offset: const Offset(0, 4),
                                       ),
@@ -522,10 +512,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                                 color: esStockBajo
                                                     ? const Color(
                                                         0xFFEF4063,
-                                                      ).withOpacity(0.3)
+                                                      ).withValues(alpha: 0.3)
                                                     : const Color(
                                                         0xFF28C76F,
-                                                      ).withOpacity(0.3),
+                                                      ).withValues(alpha: 0.3),
                                               ),
                                             ),
                                             child: Row(
@@ -706,7 +696,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.redAccent.withOpacity(0.2),
+                    color: Colors.redAccent.withValues(alpha: 0.2),
                     blurRadius: 10,
                     spreadRadius: 2,
                   ),
