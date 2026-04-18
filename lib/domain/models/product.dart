@@ -7,6 +7,7 @@ class Product {
   final String? codigoBarras;
   final String proveedor;
   final int stockMinimo; // Nivel mínimo antes de alerta
+  final bool isActive;
 
   Product({
     required this.id,
@@ -17,6 +18,7 @@ class Product {
     this.codigoBarras,
     required this.proveedor,
     this.stockMinimo = 5,
+    this.isActive = true,
   });
 
   Product copyWith({
@@ -28,6 +30,7 @@ class Product {
     String? codigoBarras,
     String? proveedor,
     int? stockMinimo,
+    bool? isActive,
   }) {
     return Product(
       id: id ?? this.id,
@@ -38,6 +41,7 @@ class Product {
       codigoBarras: codigoBarras ?? this.codigoBarras,
       proveedor: proveedor ?? this.proveedor,
       stockMinimo: stockMinimo ?? this.stockMinimo,
+      isActive: isActive ?? this.isActive,
     );
   }
 
@@ -51,6 +55,7 @@ class Product {
       'codigo_barras': codigoBarras,
       'proveedor': proveedor,
       'stock_minimo': stockMinimo,
+      'is_active': isActive ? 1 : 0,
     };
   }
 
@@ -64,6 +69,7 @@ class Product {
       codigoBarras: map['codigo_barras'],
       proveedor: map['proveedor'] ?? 'Sin Proveedor',
       stockMinimo: map['stock_minimo'] ?? 5,
+      isActive: map['is_active'] == null || map['is_active'] == 1,
     );
   }
 }

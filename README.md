@@ -1,4 +1,4 @@
-# inktrack
+# klip
 
 Proyecto de Gestor de Papeleria
 

@@ -9,7 +9,7 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDB('inktrack_v3.db');
+    _database = await _initDB('klip_v3.db');
     return _database!;
   }
 
@@ -19,7 +19,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -36,7 +36,8 @@ class DatabaseHelper {
         stock INTEGER NOT NULL,
         codigo_barras TEXT,
         proveedor TEXT NOT NULL,
-        stock_minimo INTEGER DEFAULT 5
+        stock_minimo INTEGER DEFAULT 5,
+        is_active INTEGER DEFAULT 1
       )
     ''');
 
@@ -58,7 +59,8 @@ class DatabaseHelper {
         id TEXT PRIMARY KEY,
         nombre TEXT NOT NULL,
         contacto TEXT NOT NULL,
-        empresa TEXT NOT NULL
+        empresa TEXT NOT NULL,
+        dias_visita TEXT
       )
     ''');
 
@@ -86,11 +88,21 @@ class DatabaseHelper {
     ''');
   }
 
-  /// Migración de versión 1 → 2: agrega la columna stock_minimo
+  /// Migración de versión 1 → 2 y 2 → 3
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute(
         'ALTER TABLE productos ADD COLUMN stock_minimo INTEGER DEFAULT 5',
+      );
+    }
+    if (oldVersion < 3) {
+      await db.execute(
+        'ALTER TABLE productos ADD COLUMN is_active INTEGER DEFAULT 1',
+      );
+    }
+    if (oldVersion < 4) {
+      await db.execute(
+        'ALTER TABLE proveedores ADD COLUMN dias_visita TEXT',
       );
     }
   }

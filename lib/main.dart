@@ -7,18 +7,18 @@ import 'presentation/providers/theme_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('es_CO', null);
-  runApp(const ProviderScope(child: InkTrackApp()));
+  runApp(const ProviderScope(child: KlipApp()));
 }
 
-class InkTrackApp extends ConsumerWidget {
-  const InkTrackApp({super.key});
+class KlipApp extends ConsumerWidget {
+  const KlipApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeProvider);
 
     return MaterialApp(
-      title: 'InkTrack',
+      title: 'Klip',
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
 

@@ -31,7 +31,7 @@ class PdfGenerator {
        La lógica sería algo así:
        if (modoImpresoraTermicaActivo) {
           await BluetoothPrinter.connect();
-          await BluetoothPrinter.printText("INKTRACK");
+          await BluetoothPrinter.printText("KLIP");
           await BluetoothPrinter.printText("Total: $total");
           return; // Y terminamos aquí sin generar PDF
        }
@@ -49,7 +49,7 @@ class PdfGenerator {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Center(child: pw.Text('INKTRACK', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 20))),
+              pw.Center(child: pw.Text('KLIP', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 20))),
               pw.Center(child: pw.Text('Comprobante de Venta')),
               pw.Divider(),
               pw.Text('Fecha: $fecha'),
@@ -91,7 +91,7 @@ class PdfGenerator {
     // Usamos sharePdf para abrir directamente WhatsApp, Gmail, etc.
     await Printing.sharePdf(
         bytes: await doc.save(),
-        filename: 'Recibo_InkTrack_$fechaNombre.pdf'
+        filename: 'Recibo_Klip_$fechaNombre.pdf'
     );
   }
 
@@ -128,7 +128,7 @@ class PdfGenerator {
                 child: pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                      pw.Text('Reporte Financiero - InkTrack', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 18)),
+                      pw.Text('Reporte Financiero - Klip', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 18)),
                       pw.Text('Generado: $fecha'),
                     ]
                 )

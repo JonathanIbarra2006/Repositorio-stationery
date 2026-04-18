@@ -47,6 +47,16 @@ class ProductNotifier extends StateNotifier<AsyncValue<List<Product>>> {
       return 'Error al eliminar el producto.';
     }
   }
+
+  Future<String?> deactivateProduct(String id) async {
+    try {
+      await _repository.deactivateProduct(id);
+      loadProducts();
+      return null;
+    } catch (e) {
+      return 'Error al desactivar el producto.';
+    }
+  }
   Future<String?> editProduct(Product product) async {
     try {
       await _repository.updateProduct(product);
