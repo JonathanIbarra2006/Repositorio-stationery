@@ -10,6 +10,8 @@ import '../providers/product_provider.dart';
 
 // Import del archivo de ventas
 import 'nuevo_producto_screen.dart';
+import 'settings_screen.dart';
+import '../theme/app_colors.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
@@ -17,6 +19,8 @@ class InventoryScreen extends ConsumerStatefulWidget {
   ConsumerState<InventoryScreen> createState() => _InventoryScreenState();
 }
 class _InventoryScreenState extends ConsumerState<InventoryScreen> {
+  bool _isStockValueVisible = true;
+
   @override
   Widget build(BuildContext context) {
     final productsAsync = ref.watch(productsProvider);
@@ -60,7 +64,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           ),
                           const SizedBox(width: 8),
                           const Text(
-                            'InkTrack',
+                            'Klip',
                             style: TextStyle(
                               color: Colors.black,
                               fontWeight: FontWeight.w900,
@@ -92,45 +96,15 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       ),
                     ],
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade200),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      children: [
-                        const Text(
-                          'jarh207',
-                          style: TextStyle(
-                            color: Colors.black87,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFEF4063),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Center(
-                            child: Text(
-                              'J',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                  GestureDetector(
+                    onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                    child: const CircleAvatar(
+                      radius: 18,
+                      backgroundColor: kAccent,
+                      child: Text('J',
+                        style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
@@ -192,10 +166,17 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                   ),
                                   Row(
                                     children: [
-                                      Icon(
-                                        Icons.visibility_off,
-                                        color: Colors.blueGrey.shade800,
-                                        size: 22,
+                                      GestureDetector(
+                                        onTap: () {
+                                          setState(() {
+                                            _isStockValueVisible = !_isStockValueVisible;
+                                          });
+                                        },
+                                        child: Icon(
+                                          _isStockValueVisible ? Icons.visibility : Icons.visibility_off,
+                                          color: Colors.blueGrey.shade800,
+                                          size: 22,
+                                        ),
                                       ),
                                       const SizedBox(width: 16),
                                       Icon(
@@ -320,7 +301,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        '\$${(valorTotalInventario / 1000000).toStringAsFixed(1)}M', // Simplified display like in mockup
+                                        _isStockValueVisible ? '\$${(valorTotalInventario / 1000000).toStringAsFixed(1)}M' : '***', // Simplified display like in mockup
                                         style: const TextStyle(
                                           color: Color(0xFF28C76F),
                                           fontSize: 24,
@@ -611,11 +592,11 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('Eliminar Producto'),
+                leading: const Icon(Icons.block, color: Colors.red),
+                title: const Text('Desactivar Producto'),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _confirmDelete(context, ref, p);
+                  _confirmDeactivate(context, ref, p);
                 },
               ),
             ],
@@ -625,23 +606,49 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     );
   }
 
-  void _confirmDelete(BuildContext context, WidgetRef ref, Product p) {
+  void _confirmDeactivate(BuildContext context, WidgetRef ref, Product p) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar'),
-        content: Text('¿Borrar ${p.nombre}?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.all(24),
+        title: const Text(
+          'Desactivar producto',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '¿Deseas desactivar "${p.nombre}"?',
+              style: const TextStyle(fontSize: 16, color: Colors.black87),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'No aparecerá en el listado ni en nuevas ventas, pero sus registros históricos se conservarán.',
+              style: TextStyle(fontSize: 14, color: Colors.black54),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            child: const Text('Cancelar', style: TextStyle(color: Color(0xFFEF4063), fontWeight: FontWeight.bold)),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () {
-              ref.read(productsProvider.notifier).deleteProduct(p.id);
+              ref.read(productsProvider.notifier).deactivateProduct(p.id);
               Navigator.pop(ctx);
             },
-            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4063),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: const Text('Desactivar', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),

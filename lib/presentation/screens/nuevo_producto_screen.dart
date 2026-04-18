@@ -270,12 +270,17 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
                     decoration: _hint('Cantidad', subColor),
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'La cantidad es requerida' : null,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'La cantidad es requerida';
+                      final n = int.tryParse(v);
+                      if (n == null) return 'Ingrese un número válido';
+                      if (n > 1000) return 'Máximo 1000 unidades';
+                      return null;
+                    },
                   ),
                   Padding(
                     padding: const EdgeInsets.only(left: 16, bottom: 10),
-                    child: Text('Máximo 99 unidades',
+                    child: Text('Máximo 1000 unidades',
                         style: TextStyle(color: subColor, fontSize: 12)),
                   ),
                 ],
@@ -296,12 +301,17 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
                     decoration: _hint('Precio', subColor),
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'El precio es requerido' : null,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'El precio es requerido';
+                      final n = double.tryParse(v);
+                      if (n == null) return 'Ingrese un monto válido';
+                      if (n > 9000000) return 'Máximo 9,000,000';
+                      return null;
+                    },
                   ),
                   Padding(
                     padding: const EdgeInsets.only(left: 16, bottom: 10),
-                    child: Text('Máximo 9,999,999',
+                    child: Text('Máximo 9,000,000',
                         style: TextStyle(color: subColor, fontSize: 12)),
                   ),
                 ],

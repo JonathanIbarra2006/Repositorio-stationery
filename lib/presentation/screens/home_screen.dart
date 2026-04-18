@@ -31,7 +31,7 @@ class AppHeader extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               const Text(
-                'InkTrack',
+                'Klip',
                 style: TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: 20,
@@ -44,7 +44,7 @@ class AppHeader extends StatelessWidget {
                 child: const CircleAvatar(
                   radius: 18,
                   backgroundColor: kAccent,
-                  child: Text('U',
+                  child: Text('J',
                       style: TextStyle(
                           color: Colors.white, fontWeight: FontWeight.bold)),
                 ),

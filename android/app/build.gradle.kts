@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.inktrack"
+    namespace = "com.example.klip"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.inktrack"
+        applicationId = "com.example.klip"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = 1

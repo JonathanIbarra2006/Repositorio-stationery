@@ -12,12 +12,12 @@ class ProductRepository {
     if (query != null && query.isNotEmpty) {
       maps = await db.query(
         'productos',
-        where: 'nombre LIKE ? OR codigo_barras LIKE ?', // Buscamos por nombre O código
+        where: '(nombre LIKE ? OR codigo_barras LIKE ?) AND is_active = 1', // Buscamos por nombre O código, y solo activos
         whereArgs: ['%$query%', '%$query%'],
         orderBy: 'nombre ASC',
       );
     } else {
-      maps = await db.query('productos', orderBy: 'nombre ASC');
+      maps = await db.query('productos', where: 'is_active = 1', orderBy: 'nombre ASC');
     }
 
     return List.generate(maps.length, (i) => Product.fromMap(maps[i]));
@@ -38,6 +38,15 @@ class ProductRepository {
   Future<void> deleteProduct(String id) async {
     final db = await dbHelper.database;
     await db.delete('productos', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> deactivateProduct(String id) async {
+    final db = await dbHelper.database;
+    await db.update(
+        'productos',
+        {'is_active': 0},
+        where: 'id = ?',
+        whereArgs: [id]);
   }
 
   Future<void> updateProduct(Product product) async {
