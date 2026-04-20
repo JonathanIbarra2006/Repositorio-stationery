@@ -35,18 +35,6 @@ class ProductNotifier extends StateNotifier<AsyncValue<List<Product>>> {
     }
   }
 
-  Future<String?> deleteProduct(String id) async {
-    try {
-      await _repository.deleteProduct(id);
-      loadProducts();
-      return null;
-    } catch (e) {
-      if (e.toString().contains('EN_USO')) {
-        return 'No se puede eliminar: El producto tiene historial de ventas o fiados.';
-      }
-      return 'Error al eliminar el producto.';
-    }
-  }
 
   Future<String?> deactivateProduct(String id) async {
     try {

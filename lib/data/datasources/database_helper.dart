@@ -19,7 +19,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 6,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -49,7 +49,8 @@ class DatabaseHelper {
         monto REAL NOT NULL,
         fecha TEXT NOT NULL,
         descripcion TEXT NOT NULL,
-        categoria TEXT NOT NULL
+        categoria TEXT NOT NULL,
+        cliente_id TEXT
       )
     ''');
 
@@ -60,7 +61,8 @@ class DatabaseHelper {
         nombre TEXT NOT NULL,
         contacto TEXT NOT NULL,
         empresa TEXT NOT NULL,
-        dias_visita TEXT
+        dias_visita TEXT,
+        is_active INTEGER DEFAULT 1
       )
     ''');
 
@@ -69,7 +71,8 @@ class DatabaseHelper {
       CREATE TABLE clientes (
         id TEXT PRIMARY KEY,
         nombre TEXT NOT NULL,
-        telefono TEXT
+        telefono TEXT,
+        is_active INTEGER DEFAULT 1
       )
     ''');
 
@@ -103,6 +106,19 @@ class DatabaseHelper {
     if (oldVersion < 4) {
       await db.execute(
         'ALTER TABLE proveedores ADD COLUMN dias_visita TEXT',
+      );
+    }
+    if (oldVersion < 5) {
+      await db.execute(
+        'ALTER TABLE proveedores ADD COLUMN is_active INTEGER DEFAULT 1',
+      );
+      await db.execute(
+        'ALTER TABLE clientes ADD COLUMN is_active INTEGER DEFAULT 1',
+      );
+    }
+    if (oldVersion < 6) {
+      await db.execute(
+        'ALTER TABLE transacciones ADD COLUMN cliente_id TEXT',
       );
     }
   }

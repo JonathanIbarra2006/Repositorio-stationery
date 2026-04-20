@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
-// Modelos y Providers
 import '../../domain/models/product.dart';
 import '../../domain/models/transaction.dart';
 import '../providers/product_provider.dart';
@@ -12,7 +11,6 @@ import '../providers/transaction_provider.dart';
 import '../providers/fiado_provider.dart';
 import '../theme/app_colors.dart';
 import '../../core/utils/pdf_generator.dart';
-
 
 class VentaDeContadoScreen extends ConsumerStatefulWidget {
   const VentaDeContadoScreen({super.key});
@@ -22,19 +20,14 @@ class VentaDeContadoScreen extends ConsumerStatefulWidget {
 }
 
 class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
-  // Estado del carrito
   final Map<Product, int> _carrito = {};
   Product? _productoSeleccionado;
   final TextEditingController _cantidadCtrl = TextEditingController(text: '1');
 
-  // Control de UI
   bool _procesando = false;
-
-  // ── Venta a crédito (fiado) ──────────────────────────────────────────
   bool _esFiado = false;
-  String? _clienteIdParaFiado;
+  String? _clienteIdSeleccionado;
 
-  // Cálculos
   double get _totalVenta {
     double total = 0;
     _carrito.forEach((p, c) => total += p.precio * c);
@@ -47,7 +40,6 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
     super.dispose();
   }
 
-  // Métodos de ayuda para incrementar/decrementar
   void _incrementarCantidad() {
     int actual = int.tryParse(_cantidadCtrl.text) ?? 1;
     if (_productoSeleccionado != null) {
@@ -75,15 +67,13 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
     final productsAsync = ref.watch(productsProvider);
     final currency = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 
-    // --- MODO OSCURO / ESTILOS ---
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = isDark ? const Color(0xFF121212) : Colors.grey[100];
     final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
     final subTextColor = isDark ? Colors.grey[400] : Colors.grey[600];
-    // Input styles
     final inputFillColor = isDark ? const Color(0xFF2C2C2C) : Colors.white;
-    final borderColor = isDark ? Colors.grey.shade600 : Colors.black; // Alto contraste en light
+    final borderColor = isDark ? Colors.grey.shade600 : Colors.black;
 
     InputDecoration inputDecoration(String label) {
       return InputDecoration(
@@ -119,22 +109,18 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
         children: [
           Column(
             children: [
-              // 1. ZONA DE SELECCIÓN (Panel Superior)
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                     color: cardColor,
                     borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5))]
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))]
                 ),
                 child: productsAsync.when(
                   loading: () => const LinearProgressIndicator(),
-                  error: (e, _) => Text('Error cargando inventario', style: TextStyle(color: Colors.red)),
+                  error: (e, _) => const Text('Error cargando inventario', style: TextStyle(color: Colors.red)),
                   data: (productos) {
-                    // Filtramos productos con stock > 0
                     final productosDisponibles = productos.where((p) => p.stock > 0).toList();
-
-                    // Ordenar alfabéticamente
                     productosDisponibles.sort((a, b) => a.nombre.compareTo(b.nombre));
 
                     return Column(
@@ -144,7 +130,6 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            // DROPDOWN DE PRODUCTOS
                             Expanded(
                               flex: 3,
                               child: DropdownButtonFormField<Product>(
@@ -156,11 +141,10 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
                                 initialValue: _productoSeleccionado,
                                 icon: Icon(Icons.arrow_drop_down, color: textColor),
                                 style: TextStyle(color: textColor, fontSize: 16),
-                                // Bloqueamos si procesa
                                 onChanged: _procesando ? null : (val) {
                                   setState(() {
                                     _productoSeleccionado = val;
-                                    _cantidadCtrl.text = '1'; // Reiniciar cantidad al cambiar
+                                    _cantidadCtrl.text = '1';
                                   });
                                 },
                                 items: productosDisponibles.map((p) => DropdownMenuItem(
@@ -178,12 +162,11 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
                         const SizedBox(height: 12),
                         Row(
                           children: [
-                            // CONTROLES DE CANTIDAD
                             Container(
                               decoration: BoxDecoration(
                                   color: isDark ? Colors.black26 : Colors.grey[200],
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: borderColor, width: 1) // Borde acorde al tema
+                                  border: Border.all(color: borderColor, width: 1)
                               ),
                               child: Row(
                                 children: [
@@ -211,7 +194,6 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
                               ),
                             ),
                             const SizedBox(width: 10),
-                            // BOTÓN AGREGAR (Grande y llamativo)
                             Expanded(
                               child: SizedBox(
                                 height: 50,
@@ -236,14 +218,13 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
                 ),
               ),
 
-              // 2. LISTA DEL CARRITO
               Expanded(
                 child: _carrito.isEmpty
                     ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.shopping_cart_outlined, size: 80, color: Colors.grey.withValues(alpha: 0.3)),
+                      Icon(Icons.shopping_cart_outlined, size: 80, color: Colors.grey.withOpacity(0.3)),
                       const SizedBox(height: 10),
                       Text('El carrito está vacío', style: TextStyle(color: subTextColor, fontSize: 18)),
                     ],
@@ -261,7 +242,7 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
                       margin: const EdgeInsets.only(bottom: 10),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: Colors.teal.withValues(alpha: 0.2),
+                          backgroundColor: Colors.teal.withOpacity(0.2),
                           child: Text('$cant', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
                         ),
                         title: Text(p.nombre, style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
@@ -289,19 +270,17 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
                 ),
               ),
 
-              // 3. ZONA DE PAGO (Bottom Bar)
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                     color: cardColor,
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, -5))],
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, -5))],
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(25))
                 ),
                 child: SafeArea(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // ── Total ──────────────────────────────────────────
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -311,13 +290,12 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      // ── Toggle Fiado ────────────────────────────────────
                       Container(
                         decoration: BoxDecoration(
-                          color: _esFiado ? kAccent.withValues(alpha: 0.08) : Colors.transparent,
+                          color: _esFiado ? kAccent.withOpacity(0.08) : Colors.transparent,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: _esFiado ? kAccent.withValues(alpha: 0.4) : Colors.grey.withValues(alpha: 0.3),
+                            color: _esFiado ? kAccent.withOpacity(0.4) : Colors.grey.withOpacity(0.3),
                           ),
                         ),
                         child: SwitchListTile(
@@ -345,17 +323,16 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
                               ? null
                               : (v) => setState(() {
                                     _esFiado = v;
-                                    _clienteIdParaFiado = null;
+                                    _clienteIdSeleccionado = null;
                                   }),
                         ),
                       ),
 
-                      // ── Selector de cliente (si es fiado) ────────────────
-                      if (_esFiado) ...[const SizedBox(height: 10), _buildClientSelector(ref, textColor, subTextColor, cardColor)],
+                      const SizedBox(height: 10),
+                      _buildClientSelector(ref, textColor, subTextColor, cardColor),
 
                       const SizedBox(height: 14),
 
-                      // ── Botón cobrar ────────────────────────────────────
                       SizedBox(
                         width: double.infinity,
                         height: 55,
@@ -391,10 +368,9 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
             ],
           ),
 
-          // 4. OVERLAY DE CARGA (Para evitar errores y toques accidentales)
           if (_procesando)
             Container(
-              color: Colors.black.withValues(alpha: 0.5),
+              color: Colors.black.withOpacity(0.5),
               child: Center(
                 child: Container(
                   padding: const EdgeInsets.all(25),
@@ -415,13 +391,11 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
     );
   }
 
-  // Lógica de Agregar al Carrito (Con Validación de Stock)
   void _agregarAlCarrito() {
     if (_productoSeleccionado == null) return;
     final int cantidadInput = int.tryParse(_cantidadCtrl.text) ?? 1;
     if (cantidadInput <= 0) return;
 
-    // Verificar si ya está en el carrito para sumar
     final cantidadEnCarrito = _carrito[_productoSeleccionado] ?? 0;
     final stockDisponible = _productoSeleccionado!.stock;
 
@@ -436,22 +410,17 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
       } else {
         _carrito[_productoSeleccionado!] = cantidadInput;
       }
-      // Feedback visual opcional
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Agregado: ${_productoSeleccionado!.nombre}'),
         duration: const Duration(milliseconds: 500),
         backgroundColor: Colors.teal,
       ));
-
-      // Resetear input
       _cantidadCtrl.text = '1';
     });
   }
 
-  // ── Selector de cliente ────────────────────────────────────────────────
-  Widget _buildClientSelector(
-      WidgetRef ref, Color textColor, Color? subColor, Color cardColor) {
+  Widget _buildClientSelector(WidgetRef ref, Color textColor, Color? subColor, Color cardColor) {
     final clientesAsync = ref.watch(clientesProvider);
 
     return clientesAsync.when(
@@ -462,25 +431,21 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
           return Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: kAccent.withValues(alpha: 0.08),
+              color: kAccent.withOpacity(0.08),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: kAccent.withValues(alpha: 0.3)),
+              border: Border.all(color: kAccent.withOpacity(0.3)),
             ),
             child: Row(
               children: [
                 const Icon(Icons.info_outline, color: kAccent, size: 20),
                 const SizedBox(width: 10),
                 const Expanded(
-                  child: Text(
-                    'No hay clientes registrados.',
-                    style: TextStyle(fontSize: 13),
-                  ),
+                  child: Text('No hay clientes registrados.', style: TextStyle(fontSize: 13)),
                 ),
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   style: TextButton.styleFrom(foregroundColor: kAccent),
-                  child: const Text('Ir a Clientes',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text('Ir a Clientes', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -488,7 +453,7 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
         }
 
         return DropdownButtonFormField<String>(
-          initialValue: _clienteIdParaFiado,
+          value: _clienteIdSeleccionado,
           dropdownColor: cardColor,
           style: TextStyle(color: textColor),
           decoration: InputDecoration(
@@ -496,11 +461,9 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
             labelStyle: TextStyle(color: textColor),
             prefixIcon: const Icon(Icons.person_outline, color: kAccent),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),
-          hint: Text('Selecciona un cliente',
-              style: TextStyle(color: subColor)),
+          hint: Text('Selecciona un cliente', style: TextStyle(color: subColor)),
           isExpanded: true,
           items: clientes
               .map((c) => DropdownMenuItem(
@@ -508,16 +471,14 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
                     child: Text(c.nombre, style: TextStyle(color: textColor)),
                   ))
               .toList(),
-          onChanged: (v) => setState(() => _clienteIdParaFiado = v),
+          onChanged: (v) => setState(() => _clienteIdSeleccionado = v),
         );
       },
     );
   }
 
-  // ── Procesar Venta ────────────────────────────────────────────────────
   Future<void> _procesarVenta() async {
-    // Validar cliente si es fiado
-    if (_esFiado && _clienteIdParaFiado == null) {
+    if (_esFiado && _clienteIdSeleccionado == null) {
       _mostrarError('Selecciona un cliente para el fiado');
       return;
     }
@@ -534,9 +495,8 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
 
     try {
       if (_esFiado) {
-        // ── Venta a crédito: registrarFiado maneja stock + deuda ────────
         await ref.read(clientesProvider.notifier).registrarFiado(
-              clienteIdExistente: _clienteIdParaFiado,
+              clienteIdExistente: _clienteIdSeleccionado,
               carrito: _carrito,
               totalDeuda: _totalVenta,
             );
@@ -547,7 +507,7 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
             _procesando = false;
             _carrito.clear();
             _esFiado = false;
-            _clienteIdParaFiado = null;
+            _clienteIdSeleccionado = null;
           });
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Row(children: [
@@ -561,14 +521,11 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
           Navigator.pop(context);
         }
       } else {
-        // ── Venta de contado ─────────────────────────────────────────────
         final fecha = DateTime.now();
-        final descripcionVenta =
-            _carrito.entries.map((e) => '${e.value}x ${e.key.nombre}').join(', ');
+        final descripcionVenta = _carrito.entries.map((e) => '${e.value}x ${e.key.nombre}').join(', ');
 
         for (var entry in _carrito.entries) {
-          final nuevoProducto =
-              entry.key.copyWith(stock: entry.key.stock - entry.value);
+          final nuevoProducto = entry.key.copyWith(stock: entry.key.stock - entry.value);
           await ref.read(productsProvider.notifier).editProduct(nuevoProducto);
         }
 
@@ -578,7 +535,8 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
             monto: _totalVenta,
             fecha: fecha,
             descripcion: 'Venta Contado: $descripcionVenta',
-            categoria: 'Ventas Mostrador');
+            categoria: 'Ventas Mostrador',
+            clienteId: _clienteIdSeleccionado);
 
         await ref.read(transactionsProvider.notifier).addTransaction(nuevaTransaccion);
 
@@ -588,12 +546,8 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
             context: context,
             barrierDismissible: false,
             builder: (ctx) => AlertDialog(
-              backgroundColor:
-                  Theme.of(context).brightness == Brightness.dark
-                      ? const Color(0xFF1E1E1E)
-                      : Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
+              backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               title: const Row(children: [
                 Icon(Icons.check_circle, color: Colors.green, size: 30),
                 SizedBox(width: 10),
@@ -609,15 +563,12 @@ class _VentaDeContadoScreenState extends ConsumerState<VentaDeContadoScreen> {
                   child: const Text('No, Salir'),
                 ),
                 ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
-                      foregroundColor: Colors.white),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
                   icon: const Icon(Icons.print),
                   label: const Text('Ver Recibo'),
                   onPressed: () {
                     Navigator.pop(ctx);
-                    PdfGenerator.generateReceipt(
-                        carritoParaRecibo, totalParaRecibo);
+                    PdfGenerator.generateReceipt(carritoParaRecibo, totalParaRecibo);
                     setState(() => _carrito.clear());
                   },
                 ),

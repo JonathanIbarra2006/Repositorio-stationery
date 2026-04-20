@@ -7,6 +7,7 @@ class AppTransaction {
   final DateTime fecha;
   final String? categoria; // Obligatorio para gastos, opcional para ingresos rápidos
   final String descripcion;
+  final String? clienteId; // Opcional: para saber qué cliente realizó la compra
 
   AppTransaction({
     required this.id,
@@ -15,6 +16,7 @@ class AppTransaction {
     required this.fecha,
     this.categoria,
     required this.descripcion,
+    this.clienteId,
   });
 
   Map<String, dynamic> toMap() {
@@ -25,6 +27,7 @@ class AppTransaction {
       'fecha': fecha.toIso8601String(), // SQLite prefiere las fechas en texto ISO
       'categoria': categoria,
       'descripcion': descripcion,
+      'cliente_id': clienteId,
     };
   }
 
@@ -36,6 +39,7 @@ class AppTransaction {
       fecha: DateTime.parse(map['fecha']),
       categoria: map['categoria'],
       descripcion: map['descripcion'],
+      clienteId: map['cliente_id'],
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/models/transaction.dart';
 import '../../data/repositories/transaction_repository.dart';
+import 'date_range_provider.dart';
 
 final transactionRepoProvider = Provider((ref) => TransactionRepository());
 
@@ -16,9 +17,7 @@ class TransactionState {
 class TransactionNotifier extends StateNotifier<AsyncValue<TransactionState>> {
   final TransactionRepository _repository;
 
-  TransactionNotifier(this._repository) : super(const AsyncValue.loading()) {
-    loadTransactions();
-  }
+  TransactionNotifier(this._repository) : super(const AsyncValue.loading());
 
   Future<void> loadTransactions({DateTime? startDate, DateTime? endDate}) async {
     state = const AsyncValue.loading();
@@ -68,5 +67,17 @@ class TransactionNotifier extends StateNotifier<AsyncValue<TransactionState>> {
 }
 
 final transactionsProvider = StateNotifierProvider<TransactionNotifier, AsyncValue<TransactionState>>((ref) {
-  return TransactionNotifier(ref.watch(transactionRepoProvider));
+  final repo = ref.watch(transactionRepoProvider);
+  final dateRange = ref.watch(dateRangeProvider);
+  
+  final notifier = TransactionNotifier(repo);
+  
+  // Cargamos con el rango inicial
+  // Usamos microtask para evitar errores de actualización durante el build
+  Future.microtask(() => notifier.loadTransactions(
+    startDate: dateRange.range?.start,
+    endDate: dateRange.range?.end,
+  ));
+  
+  return notifier;
 });

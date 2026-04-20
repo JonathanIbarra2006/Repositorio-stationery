@@ -4,6 +4,7 @@ class Proveedor {
   final String contacto; // Teléfono o email
   final String empresa;
   final String? diasVisita;
+  final bool isActive;
 
   Proveedor({
     required this.id,
@@ -11,6 +12,7 @@ class Proveedor {
     required this.contacto,
     required this.empresa,
     this.diasVisita,
+    this.isActive = true,
   });
 
   Map<String, dynamic> toMap() => {
@@ -19,6 +21,7 @@ class Proveedor {
     'contacto': contacto,
     'empresa': empresa,
     'dias_visita': diasVisita,
+    'is_active': isActive ? 1 : 0,
   };
 
   factory Proveedor.fromMap(Map<String, dynamic> map) => Proveedor(
@@ -27,5 +30,6 @@ class Proveedor {
     contacto: map['contacto'],
     empresa: map['empresa'],
     diasVisita: map['dias_visita'],
+    isActive: map['is_active'] == null || map['is_active'] == 1,
   );
 }
