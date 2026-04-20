@@ -2,15 +2,17 @@ class Cliente {
   final String id;
   final String nombre;
   final String? telefono;
+  final bool isActive;
 
-  Cliente({required this.id, required this.nombre, this.telefono});
+  Cliente({required this.id, required this.nombre, this.telefono, this.isActive = true});
 
-  Map<String, dynamic> toMap() => {'id': id, 'nombre': nombre, 'telefono': telefono};
+  Map<String, dynamic> toMap() => {'id': id, 'nombre': nombre, 'telefono': telefono, 'is_active': isActive ? 1 : 0};
 
   factory Cliente.fromMap(Map<String, dynamic> map) => Cliente(
       id: map['id'],
       nombre: map['nombre'],
-      telefono: map['telefono']
+      telefono: map['telefono'],
+      isActive: map['is_active'] == null || map['is_active'] == 1,
   );
 
   // --- ESTA ES LA SOLUCIÓN AL ERROR DE LA PANTALLA ROJA ---

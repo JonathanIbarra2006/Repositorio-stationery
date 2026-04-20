@@ -8,7 +8,7 @@ import '../../data/datasources/database_helper.dart';
 import '../providers/fiado_provider.dart';
 import '../theme/app_colors.dart';
 import 'detalle_cliente_screen.dart';
-import 'home_screen.dart' show AppHeader;
+import '../widgets/klip_header.dart';
 
 class FiadosScreen extends ConsumerWidget {
   const FiadosScreen({super.key});
@@ -17,8 +17,7 @@ class FiadosScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final clientesAsync = ref.watch(clientesProvider);
     final statsAsync = ref.watch(carteraStatsProvider);
-    final currency =
-        NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final currency = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = isDark ? const Color(0xFF121212) : kBg;
@@ -32,14 +31,12 @@ class FiadosScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Header ────────────────────────────────────────────────────
-            const AppHeader(moduleBadge: 'GESTIÓN DE CLIENTES'),
+            const KlipHeader(title: 'Klip', badge: 'GESTIÓN DE CLIENTES'),
 
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  // ── Card de cartera ─────────────────────────────────
                   statsAsync.when(
                     loading: () => const SizedBox.shrink(),
                     error: (_, _) => const SizedBox.shrink(),
@@ -54,7 +51,6 @@ class FiadosScreen extends ConsumerWidget {
 
                   const SizedBox(height: 22),
 
-                  // ── Título sección ────────────────────────────────
                   Row(
                     children: [
                       Container(
@@ -76,12 +72,10 @@ class FiadosScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
 
-                  // ── Lista ─────────────────────────────────────────
                   clientesAsync.when(
                     loading: () => const Center(
                         child: CircularProgressIndicator(color: kAccent)),
-                    error: (e, _) =>
-                        Center(child: Text('Error: $e')),
+                    error: (e, _) => Center(child: Text('Error: $e')),
                     data: (clientes) {
                       if (clientes.isEmpty) {
                         return _EmptyClientes(subColor: subColor);
@@ -123,7 +117,6 @@ class FiadosScreen extends ConsumerWidget {
     );
   }
 
-  // ── Sheet: Nuevo cliente ────────────────────────────────────────────────
   void _showNuevoClienteSheet(BuildContext context, WidgetRef ref) {
     final formKey = GlobalKey<FormState>();
     final nombreCtrl = TextEditingController();
@@ -168,11 +161,9 @@ class FiadosScreen extends ConsumerWidget {
               TextFormField(
                 controller: nombreCtrl,
                 style: TextStyle(color: textColor),
-                decoration:
-                    _inputDeco('Nombre completo *', Icons.person, textColor),
+                decoration: _inputDeco('Nombre completo *', Icons.person, textColor),
                 textCapitalization: TextCapitalization.words,
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Requerido' : null,
+                validator: (v) => v == null || v.trim().isEmpty ? 'Requerido' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -181,8 +172,7 @@ class FiadosScreen extends ConsumerWidget {
                 decoration: _inputDeco('Teléfono *', Icons.phone, textColor),
                 keyboardType: TextInputType.phone,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (v) =>
-                    v == null || v.length < 7 ? 'Mínimo 7 dígitos' : null,
+                validator: (v) => v == null || v.length < 10 ? 'Mínimo 10 dígitos' : null,
               ),
               const SizedBox(height: 20),
               SizedBox(
@@ -196,8 +186,7 @@ class FiadosScreen extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(14))),
                   onPressed: () async {
                     if (!formKey.currentState!.validate()) return;
-                    final db =
-                        await DatabaseHelper.instance.database;
+                    final db = await DatabaseHelper.instance.database;
                     await db.insert('clientes', {
                       'id': const Uuid().v4(),
                       'nombre': nombreCtrl.text.trim(),
@@ -219,7 +208,6 @@ class FiadosScreen extends ConsumerWidget {
     );
   }
 
-  // ── Dialog: Editar cliente ────────────────────────────────────────────
   void _showEditDialog(BuildContext context, WidgetRef ref, Cliente c) {
     final nombreCtrl = TextEditingController(text: c.nombre);
     final telefonoCtrl = TextEditingController(text: c.telefono ?? '');
@@ -231,8 +219,7 @@ class FiadosScreen extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text('Editar Cliente',
             style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
         content: Form(
@@ -244,8 +231,7 @@ class FiadosScreen extends ConsumerWidget {
                 controller: nombreCtrl,
                 style: TextStyle(color: textColor),
                 decoration: _inputDeco('Nombre', Icons.person, textColor),
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Requerido' : null,
+                validator: (v) => v == null || v.trim().isEmpty ? 'Requerido' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -274,27 +260,50 @@ class FiadosScreen extends ConsumerWidget {
                   );
               if (ctx.mounted) Navigator.pop(ctx);
             },
-            child: const Text('Guardar'),
+            child: const Text('Actualizar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: ctx,
+                builder: (c2) => AlertDialog(
+                  title: const Text('Desactivar Cliente'),
+                  content: const Text('¿Estás seguro de desactivar este cliente? No aparecerá en la lista principal.'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(c2, false), child: const Text('Cancelar')),
+                    TextButton(onPressed: () => Navigator.pop(c2, true), child: const Text('Desactivar', style: TextStyle(color: kAccent))),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                final error = await ref.read(clientesProvider.notifier).desactivarCliente(c.id);
+                if (ctx.mounted) {
+                  if (error != null) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.orange));
+                  } else {
+                    Navigator.pop(ctx);
+                  }
+                }
+              }
+            },
+            child: const Text('Desactivar', style: TextStyle(color: kAccent)),
           ),
         ],
       ),
     );
   }
 
-  InputDecoration _inputDeco(
-      String label, IconData icon, Color textColor) {
+  InputDecoration _inputDeco(String label, IconData icon, Color textColor) {
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(color: textColor),
       prefixIcon: Icon(icon, color: textColor),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
   }
 }
 
-// ── Card Gestión de Cartera ───────────────────────────────────────────────────
 class _CarteraCard extends StatelessWidget {
   final CarteraStats stats;
   final NumberFormat currency;
@@ -319,7 +328,7 @@ class _CarteraCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 10,
               offset: const Offset(0, 4))
         ],
@@ -369,19 +378,16 @@ class _CarteraCard extends StatelessWidget {
                     style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
-                        color: stats.deudaTotal > 0
-                            ? kAccent
-                            : Colors.green),
+                        color: stats.deudaTotal > 0 ? kAccent : Colors.green),
                   ),
                 ],
               ),
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                    color: kAccent.withValues(alpha: 0.10),
+                    color: kAccent.withOpacity(0.10),
                     shape: BoxShape.circle),
-                child:
-                    const Icon(Icons.trending_up, color: kAccent, size: 20),
+                child: const Icon(Icons.trending_up, color: kAccent, size: 20),
               ),
             ],
           ),
@@ -397,11 +403,7 @@ class _CarteraStat extends StatelessWidget {
   final IconData icon;
   final Color color;
 
-  const _CarteraStat(
-      {required this.label,
-      required this.value,
-      required this.icon,
-      required this.color});
+  const _CarteraStat({required this.label, required this.value, required this.icon, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -413,7 +415,7 @@ class _CarteraStat extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
+                  color: color.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(6)),
               child: Icon(icon, color: color, size: 14),
             ),
@@ -426,16 +428,13 @@ class _CarteraStat extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 4),
-        Text(value,
-            style: const TextStyle(
-                fontSize: 22, fontWeight: FontWeight.bold)),
+        Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
       ],
     );
   }
 }
 
-// ── Tile de cliente ───────────────────────────────────────────────────────────
-class _ClienteTile extends StatelessWidget {
+class _ClienteTile extends ConsumerWidget {
   final Cliente cliente;
   final Color cardColor;
   final Color textColor;
@@ -453,10 +452,8 @@ class _ClienteTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final inicial = cliente.nombre.isNotEmpty
-        ? cliente.nombre[0].toUpperCase()
-        : '?';
+  Widget build(BuildContext context, WidgetRef ref) {
+    final inicial = cliente.nombre.isNotEmpty ? cliente.nombre[0].toUpperCase() : '?';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -465,59 +462,117 @@ class _ClienteTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 8,
               offset: const Offset(0, 2))
         ],
       ),
       child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
-          backgroundColor: kAccent.withValues(alpha: 0.15),
+          backgroundColor: kAccent.withOpacity(0.15),
           child: Text(inicial,
               style: const TextStyle(
                   color: kAccent,
                   fontWeight: FontWeight.bold,
                   fontSize: 16)),
         ),
-        title: Text(cliente.nombre,
-            style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: textColor,
-                fontSize: 15)),
-        subtitle: Row(
+        title: Row(
           children: [
-            Icon(Icons.phone, size: 13, color: subColor),
-            const SizedBox(width: 4),
-            Text(
-              cliente.telefono != null && cliente.telefono!.isNotEmpty
-                  ? cliente.telefono!
-                  : 'Sin teléfono',
-              style: TextStyle(color: subColor, fontSize: 13),
+            Expanded(
+              child: Text(cliente.nombre,
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                      fontSize: 15)),
             ),
+            if (cliente.deuda > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: kAccent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'CRÉDITO',
+                  style: TextStyle(
+                      color: kAccent,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5),
+                ),
+              ),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.phone, size: 13, color: subColor),
+                const SizedBox(width: 4),
+                Text(
+                  cliente.telefono != null && cliente.telefono!.isNotEmpty
+                      ? cliente.telefono!
+                      : 'Sin teléfono',
+                  style: TextStyle(color: subColor, fontSize: 13),
+                ),
+              ],
+            ),
+            if (cliente.deuda > 0) ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: kAccent.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'Debe: ${NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0).format(cliente.deuda)}',
+                  style: const TextStyle(
+                      color: kAccent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
           ],
         ),
         trailing: PopupMenuButton<String>(
           icon: Icon(Icons.more_vert, color: subColor),
-          onSelected: (v) {
+          onSelected: (v) async {
             if (v == 'ver') onTap();
             if (v == 'editar') onEdit();
+            if (v == 'desactivar') {
+               final error = await ref.read(clientesProvider.notifier).desactivarCliente(cliente.id);
+               if (error != null) {
+                 if (context.mounted) {
+                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.orange));
+                 }
+               }
+            }
           },
           itemBuilder: (_) => const [
             PopupMenuItem(
                 value: 'ver',
                 child: Row(children: [
-                  Icon(Icons.visibility_outlined),
+                  Icon(Icons.payment, size: 20),
                   SizedBox(width: 8),
-                  Text('Ver detalle')
+                  Text('Cobrar / Ver')
                 ])),
             PopupMenuItem(
                 value: 'editar',
                 child: Row(children: [
-                  Icon(Icons.edit_outlined),
+                  Icon(Icons.edit_outlined, size: 20),
                   SizedBox(width: 8),
                   Text('Editar')
+                ])),
+            PopupMenuItem(
+                value: 'desactivar',
+                child: Row(children: [
+                  Icon(Icons.person_off_outlined, size: 20, color: kAccent),
+                  SizedBox(width: 8),
+                  Text('Desactivar', style: TextStyle(color: kAccent))
                 ])),
           ],
         ),
@@ -527,7 +582,6 @@ class _ClienteTile extends StatelessWidget {
   }
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
 class _EmptyClientes extends StatelessWidget {
   final Color subColor;
 

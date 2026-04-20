@@ -139,7 +139,7 @@ class _NuevoFiadoScreenState extends ConsumerState<NuevoFiadoScreen> {
                         ),
                         keyboardType: TextInputType.phone,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        validator: (v) => _esNuevoCliente && (v == null || v.length < 7) ? 'Mínimo 7 números' : null,
+                        validator: (v) => _esNuevoCliente && (v == null || v.length < 10) ? 'Mínimo 10 números' : null,
                         onSaved: (v) => _nuevoTelefono = v!.trim(),
                       ),
                     ]

@@ -42,6 +42,8 @@ dependencies:
   share_plus: ^7.2.1
   path_provider: ^2.1.2
   mobile_scanner: ^5.0.0  # <--- AGREGA ESTA LÍNEA
+  fl_chart: ^0.71.0
+  flutter_speed_dial: ^7.0.0
 
 dev_dependencies:
   flutter_test:

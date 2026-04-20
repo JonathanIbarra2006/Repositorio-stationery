@@ -35,10 +35,6 @@ class ProductRepository {
     await db.insert('productos', product.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  Future<void> deleteProduct(String id) async {
-    final db = await dbHelper.database;
-    await db.delete('productos', where: 'id = ?', whereArgs: [id]);
-  }
 
   Future<void> deactivateProduct(String id) async {
     final db = await dbHelper.database;

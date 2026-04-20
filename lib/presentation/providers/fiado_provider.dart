@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+import 'package:sqflite/sqflite.dart';
 import '../../data/datasources/database_helper.dart';
 import '../../domain/models/product.dart';
 
@@ -8,7 +9,16 @@ class Cliente {
   final String id;
   final String nombre;
   final String? telefono;
-  Cliente({required this.id, required this.nombre, this.telefono});
+  final double deuda;
+  final bool isActive;
+
+  Cliente({
+    required this.id,
+    required this.nombre,
+    this.telefono,
+    this.deuda = 0.0,
+    this.isActive = true,
+  });
 }
 
 class FiadoDetalle {
@@ -45,11 +55,23 @@ class ClientesNotifier extends StateNotifier<AsyncValue<List<Cliente>>> {
   Future<void> loadClientes() async {
     try {
       final db = await DatabaseHelper.instance.database;
-      final result = await db.query('clientes', orderBy: 'nombre ASC');
+      // SQL Pro: Traemos el cliente y sumamos su deuda pendiente en una sola consulta
+      final result = await db.rawQuery('''
+        SELECT c.*, 
+          (SELECT TOTAL(f.total - f.monto_pagado) 
+           FROM fiados f 
+           WHERE f.cliente_id = c.id AND f.estado = 'pendiente') as deuda
+        FROM clientes c
+        WHERE c.is_active = 1
+        ORDER BY c.nombre ASC
+      ''');
+
       final clientes = result.map((row) => Cliente(
         id: row['id'] as String,
         nombre: row['nombre'] as String,
         telefono: row['telefono'] as String?,
+        deuda: (row['deuda'] as num?)?.toDouble() ?? 0.0,
+        isActive: row['is_active'] == null || row['is_active'] == 1,
       )).toList();
       state = AsyncValue.data(clientes);
     } catch (e, st) {
@@ -117,11 +139,24 @@ class ClientesNotifier extends StateNotifier<AsyncValue<List<Cliente>>> {
     });
   }
 
-  // --- EDITAR CLIENTE ---
-  Future<void> editarCliente(String id, String nuevoNombre, String nuevoTelefono) async {
+  // --- DESACTIVAR CLIENTE (En lugar de eliminar) ---
+  Future<String?> desactivarCliente(String id) async {
     final db = await DatabaseHelper.instance.database;
-    await db.update('clientes', {'nombre': nuevoNombre, 'telefono': nuevoTelefono}, where: 'id = ?', whereArgs: [id]);
+    
+    // Verificamos si tiene deudas pendientes
+    final countResult = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM fiados WHERE cliente_id = ? AND estado = 'pendiente'",
+      [id]
+    );
+    final count = Sqflite.firstIntValue(countResult) ?? 0;
+    
+    if (count > 0) {
+      return "No se puede desactivar un cliente con deudas pendientes.";
+    }
+
+    await db.update('clientes', {'is_active': 0}, where: 'id = ?', whereArgs: [id]);
     await loadClientes();
+    return null;
   }
 
   // --- REGISTRAR FIADO ---
@@ -156,6 +191,13 @@ class ClientesNotifier extends StateNotifier<AsyncValue<List<Cliente>>> {
     });
     await loadClientes();
   }
+
+  // Volvemos a poner editarCliente aquí abajo
+  Future<void> editarCliente(String id, String nuevoNombre, String nuevoTelefono) async {
+    final db = await DatabaseHelper.instance.database;
+    await db.update('clientes', {'nombre': nuevoNombre, 'telefono': nuevoTelefono}, where: 'id = ?', whereArgs: [id]);
+    await loadClientes();
+  }
 }
 
 // ────────────────────────────────────────────────
@@ -178,8 +220,9 @@ final carteraStatsProvider = FutureProvider<CarteraStats>((ref) async {
   ref.watch(clientesProvider);
 
   final db = await DatabaseHelper.instance.database;
-  final clientes = await db.query('clientes');
+  final clientes = await db.query('clientes', where: 'is_active = 1');
   final fiados = await db.query('fiados', where: "estado = 'pendiente'");
+// ... (rest of stats logic)
 
   final Set<String> idsConDeuda = {};
   double deudaTotal = 0;

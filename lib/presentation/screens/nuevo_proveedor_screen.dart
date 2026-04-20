@@ -66,6 +66,16 @@ class _NuevoProveedorScreenState extends ConsumerState<NuevoProveedorScreen> {
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_diasSeleccionados.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor seleccione al menos 1 día de visita'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     final diasVisitaStr = _diasSeleccionados.isEmpty 
         ? null 
         : _diasSeleccionados.toList().join(', ');
@@ -134,7 +144,7 @@ class _NuevoProveedorScreenState extends ConsumerState<NuevoProveedorScreen> {
                 keyboardType: TextInputType.phone,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: _inputDecoration('Número de contacto'),
-                validator: (v) => v == null || v.length < 7 ? 'Mínimo 7 dígitos' : null,
+                validator: (v) => v == null || v.length < 10 ? 'Mínimo 10 dígitos' : null,
               ),
             ),
             Padding(

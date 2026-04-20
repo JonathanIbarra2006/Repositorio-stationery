@@ -5,7 +5,7 @@ import '../../domain/models/proveedor.dart';
 import '../providers/proveedor_provider.dart';
 import '../providers/product_provider.dart';
 import '../theme/app_colors.dart';
-import 'home_screen.dart' show AppHeader;
+import '../widgets/klip_header.dart';
 import 'nuevo_proveedor_screen.dart';
 
 class ProveedoresScreen extends ConsumerStatefulWidget {
@@ -34,13 +34,12 @@ class _ProveedoresScreenState extends ConsumerState<ProveedoresScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            const AppHeader(moduleBadge: 'PROVEEDORES'),
+            const KlipHeader(title: 'Klip', badge: 'PROVEEDORES'),
             Expanded(
               child: state.when(
                 loading: () => const Center(child: CircularProgressIndicator(color: kAccent)),
                 error: (e, _) => Center(child: Text('Error: $e')),
                 data: (list) {
-                  // Calculate stats: Total products from all providers
                   int totalProductos = 0;
                   productsAsync.whenData((prods) {
                     totalProductos = prods.length;
@@ -52,7 +51,6 @@ class _ProveedoresScreenState extends ConsumerState<ProveedoresScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                     physics: const BouncingScrollPhysics(),
                     children: [
-                      // --- DASHBOARD CARD ---
                       Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
@@ -151,7 +149,7 @@ class _ProveedoresScreenState extends ConsumerState<ProveedoresScreen> {
                             context,
                             MaterialPageRoute(builder: (_) => NuevoProveedorScreen(proveedorAEditar: p)),
                           ),
-                          onDelete: () => _confirmDelete(context, ref, p),
+                          onDelete: () => _confirmDeactivate(context, ref, p),
                         )),
                       const SizedBox(height: 80),
                     ],
@@ -190,21 +188,21 @@ class _ProveedoresScreenState extends ConsumerState<ProveedoresScreen> {
     );
   }
 
-  void _confirmDelete(BuildContext context, WidgetRef ref, Proveedor p) {
+  void _confirmDeactivate(BuildContext context, WidgetRef ref, Proveedor p) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Eliminar Proveedor', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Text('¿Deseas eliminar a "${p.empresa}" del sistema?'),
+        title: const Text('Desactivar Proveedor', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Text('¿Deseas desactivar a "${p.empresa}" del sistema? No aparecerá en la lista activa.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
           TextButton(
             onPressed: () {
-              ref.read(proveedoresProvider.notifier).deleteProveedor(p.id);
+              ref.read(proveedoresProvider.notifier).desactivarProveedor(p.id);
               Navigator.pop(ctx);
             },
-            child: const Text('Eliminar', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            child: const Text('Desactivar', style: TextStyle(color: kAccent, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -322,7 +320,7 @@ class _SupplierCard extends StatelessWidget {
             },
             itemBuilder: (_) => const [
               PopupMenuItem(value: 'editar', child: Text('Editar')),
-              PopupMenuItem(value: 'eliminar', child: Text('Eliminar', style: TextStyle(color: Colors.red))),
+              PopupMenuItem(value: 'eliminar', child: Text('Desactivar', style: TextStyle(color: kAccent))),
             ],
           ),
         ],
