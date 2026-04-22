@@ -49,7 +49,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 16,
             offset: const Offset(0, -4),
           ),
@@ -72,7 +72,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: isActive
-                        ? _accent.withOpacity(0.10)
+                        ? _accent.withValues(alpha: 0.10)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(14),
                   ),

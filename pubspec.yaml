@@ -44,6 +44,9 @@ dependencies:
   mobile_scanner: ^5.0.0  # <--- AGREGA ESTA LÍNEA
   fl_chart: ^0.71.0
   flutter_speed_dial: ^7.0.0
+  supabase_flutter: ^2.12.4
+  connectivity_plus: ^7.1.1
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:
