@@ -9,6 +9,7 @@ class Cliente {
   final String id;
   final String nombre;
   final String? telefono;
+  final String? email;
   final double deuda;
   final bool isActive;
 
@@ -16,6 +17,7 @@ class Cliente {
     required this.id,
     required this.nombre,
     this.telefono,
+    this.email,
     this.deuda = 0.0,
     this.isActive = true,
   });
@@ -52,9 +54,12 @@ class ClientesNotifier extends StateNotifier<AsyncValue<List<Cliente>>> {
     loadClientes();
   }
 
-  Future<void> loadClientes() async {
+  Future<void> loadClientes({bool includeInactive = true}) async {
     try {
       final db = await DatabaseHelper.instance.database;
+      
+      final whereClause = includeInactive ? '' : 'WHERE c.is_active = 1';
+      
       // SQL Pro: Traemos el cliente y sumamos su deuda pendiente en una sola consulta
       final result = await db.rawQuery('''
         SELECT c.*, 
@@ -62,7 +67,7 @@ class ClientesNotifier extends StateNotifier<AsyncValue<List<Cliente>>> {
            FROM fiados f 
            WHERE f.cliente_id = c.id AND f.estado = 'pendiente') as deuda
         FROM clientes c
-        WHERE c.is_active = 1
+        $whereClause
         ORDER BY c.nombre ASC
       ''');
 
@@ -70,6 +75,7 @@ class ClientesNotifier extends StateNotifier<AsyncValue<List<Cliente>>> {
         id: row['id'] as String,
         nombre: row['nombre'] as String,
         telefono: row['telefono'] as String?,
+        email: row['email'] as String?,
         deuda: (row['deuda'] as num?)?.toDouble() ?? 0.0,
         isActive: row['is_active'] == null || row['is_active'] == 1,
       )).toList();
@@ -159,6 +165,18 @@ class ClientesNotifier extends StateNotifier<AsyncValue<List<Cliente>>> {
     return null;
   }
 
+  Future<void> reactivarCliente(String id) async {
+    final db = await DatabaseHelper.instance.database;
+    await db.update('clientes', {'is_active': 1}, where: 'id = ?', whereArgs: [id]);
+    await loadClientes();
+  }
+
+  Future<void> eliminarClientePermanentemente(String id) async {
+    final db = await DatabaseHelper.instance.database;
+    await db.delete('clientes', where: 'id = ?', whereArgs: [id]);
+    await loadClientes();
+  }
+
   // --- REGISTRAR FIADO ---
   Future<void> registrarFiado({
     String? clienteIdExistente, String? nombreNuevo, String? telefonoNuevo,
@@ -192,10 +210,26 @@ class ClientesNotifier extends StateNotifier<AsyncValue<List<Cliente>>> {
     await loadClientes();
   }
 
-  // Volvemos a poner editarCliente aquí abajo
-  Future<void> editarCliente(String id, String nuevoNombre, String nuevoTelefono) async {
+  Future<void> registrarNuevoClienteDirecto(String nombre, String telefono, String? email) async {
     final db = await DatabaseHelper.instance.database;
-    await db.update('clientes', {'nombre': nuevoNombre, 'telefono': nuevoTelefono}, where: 'id = ?', whereArgs: [id]);
+    await db.insert('clientes', {
+      'id': const Uuid().v4(),
+      'nombre': nombre,
+      'telefono': telefono,
+      'email': email,
+      'is_active': 1
+    });
+    await loadClientes();
+  }
+
+  // Volvemos a poner editarCliente aquí abajo
+  Future<void> editarCliente(String id, String nuevoNombre, String nuevoTelefono, String? nuevoEmail) async {
+    final db = await DatabaseHelper.instance.database;
+    await db.update('clientes', {
+      'nombre': nuevoNombre,
+      'telefono': nuevoTelefono,
+      'email': nuevoEmail
+    }, where: 'id = ?', whereArgs: [id]);
     await loadClientes();
   }
 }

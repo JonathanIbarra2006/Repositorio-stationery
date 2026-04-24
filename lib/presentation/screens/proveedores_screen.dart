@@ -17,6 +17,7 @@ class ProveedoresScreen extends ConsumerStatefulWidget {
 
 class _ProveedoresScreenState extends ConsumerState<ProveedoresScreen> {
   bool _isStatsVisible = true;
+  bool _showingInactive = false;
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +49,7 @@ class _ProveedoresScreenState extends ConsumerState<ProveedoresScreen> {
                   final conRutaCount = list.where((p) => p.diasVisita != null && p.diasVisita!.isNotEmpty).length;
 
                   return ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     physics: const BouncingScrollPhysics(),
                     children: [
                       Container(
@@ -73,54 +74,78 @@ class _ProveedoresScreenState extends ConsumerState<ProveedoresScreen> {
                                 Text(
                                   'Resumen\nProveedores',
                                   style: TextStyle(
-                                    fontSize: 24,
+                                    fontSize: 22,
                                     fontWeight: FontWeight.w900,
                                     color: textColor,
                                     height: 1.2,
                                   ),
                                 ),
-                                IconButton(
-                                  icon: Icon(
-                                    _isStatsVisible ? Icons.visibility : Icons.visibility_off,
-                                    color: Colors.blueGrey.shade800,
-                                    size: 26,
-                                  ),
-                                  onPressed: () => setState(() => _isStatsVisible = !_isStatsVisible),
+                                Row(
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () => setState(() => _showingInactive = !_showingInactive),
+                                      child: Icon(
+                                        _showingInactive ? Icons.visibility : Icons.visibility_off,
+                                        color: _showingInactive ? kAccent : subColor,
+                                        size: 22,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    GestureDetector(
+                                      onTap: () => setState(() => _isStatsVisible = !_isStatsVisible),
+                                      child: Icon(
+                                        _isStatsVisible ? Icons.analytics : Icons.analytics_outlined,
+                                        color: subColor,
+                                        size: 22,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
                             const SizedBox(height: 24),
                             Row(
                               children: [
-                                _StatColumn(
+                                _StatItem(
                                   label: 'Total',
                                   value: list.length.toString(),
                                   icon: Icons.local_shipping,
-                                  color: Colors.green.shade400,
+                                  color: Colors.green,
                                 ),
-                                const SizedBox(width: 48),
-                                _StatColumn(
+                                const SizedBox(width: 40),
+                                _StatItem(
                                   label: 'Con Ruta',
                                   value: conRutaCount.toString(),
                                   icon: Icons.alt_route,
-                                  color: const Color(0xFFFDE8EE).withOpacity(0.8),
-                                  iconColor: kAccent,
+                                  color: kAccent,
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 32),
-                            Text(
-                              'Estadísticas',
-                              style: TextStyle(color: subColor, fontSize: 13, fontWeight: FontWeight.w600),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _isStatsVisible ? totalProductos.toString() : '***',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF28C76F),
-                              ),
+                            const Divider(height: 32),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Estadísticas', style: TextStyle(color: subColor, fontSize: 13)),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _isStatsVisible ? totalProductos.toString() : '***',
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFF28C76F),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(color: const Color(0xFF28C76F).withOpacity(0.10), shape: BoxShape.circle),
+                                  child: const Icon(Icons.trending_up, color: Color(0xFF28C76F), size: 20),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -128,29 +153,38 @@ class _ProveedoresScreenState extends ConsumerState<ProveedoresScreen> {
                       
                       const SizedBox(height: 32),
                       Text(
-                        'Listado de Proveedores',
+                        _showingInactive ? 'Proveedores Desactivados' : 'Listado de Proveedores',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
-                          color: textColor.withOpacity(0.9),
+                          color: _showingInactive ? Colors.grey : textColor.withOpacity(0.9),
                         ),
                       ),
                       const SizedBox(height: 16),
                       
                       if (list.isEmpty)
                         _buildEmptyState(subColor)
-                      else
-                        ...list.map((p) => _SupplierCard(
-                          proveedor: p,
-                          cardColor: cardColor,
-                          textColor: textColor,
-                          subColor: subColor,
-                          onEdit: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => NuevoProveedorScreen(proveedorAEditar: p)),
-                          ),
-                          onDelete: () => _confirmDeactivate(context, ref, p),
-                        )),
+                      else ...[
+                        (() {
+                          final filtered = list.where((p) => p.isActive == !_showingInactive).toList();
+                          if (filtered.isEmpty) {
+                             return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_showingInactive ? 'No hay proveedores desactivados.' : 'No hay proveedores activos.')));
+                          }
+                          return Column(
+                            children: filtered.map((p) => _SupplierCard(
+                              proveedor: p,
+                              cardColor: cardColor,
+                              textColor: textColor,
+                              subColor: subColor,
+                              onEdit: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => NuevoProveedorScreen(proveedorAEditar: p)),
+                              ),
+                              onDelete: () => _confirmDeactivate(context, ref, p),
+                            )).toList(),
+                          );
+                        })(),
+                      ],
                       const SizedBox(height: 80),
                     ],
                   );
@@ -210,13 +244,12 @@ class _ProveedoresScreenState extends ConsumerState<ProveedoresScreen> {
   }
 }
 
-class _StatColumn extends StatelessWidget {
+class _StatItem extends StatelessWidget {
   final String label, value;
   final IconData icon;
   final Color color;
-  final Color? iconColor;
 
-  const _StatColumn({required this.label, required this.value, required this.icon, required this.color, this.iconColor});
+  const _StatItem({required this.label, required this.value, required this.icon, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -228,10 +261,10 @@ class _StatColumn extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
-              child: Icon(icon, color: iconColor ?? color, size: 14),
+              child: Icon(icon, color: color, size: 14),
             ),
             const SizedBox(width: 8),
-            Text(label, style: TextStyle(color: iconColor ?? color, fontSize: 13, fontWeight: FontWeight.bold)),
+            Text(label, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.bold)),
           ],
         ),
         const SizedBox(height: 8),
@@ -241,7 +274,7 @@ class _StatColumn extends StatelessWidget {
   }
 }
 
-class _SupplierCard extends StatelessWidget {
+class _SupplierCard extends ConsumerWidget {
   final Proveedor proveedor;
   final Color cardColor, textColor, subColor;
   final VoidCallback onEdit, onDelete;
@@ -256,7 +289,7 @@ class _SupplierCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -317,11 +350,42 @@ class _SupplierCard extends StatelessWidget {
             onSelected: (v) {
               if (v == 'editar') onEdit();
               if (v == 'eliminar') onDelete();
+              if (v == 'reactivar') {
+                ref.read(proveedoresProvider.notifier).reactivarProveedor(proveedor.id);
+              }
+              if (v == 'eliminar_permanente') {
+                _confirmDeletePermanently(context, ref, proveedor);
+              }
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'editar', child: Text('Editar')),
-              PopupMenuItem(value: 'eliminar', child: Text('Desactivar', style: TextStyle(color: kAccent))),
+            itemBuilder: (_) => [
+              if (proveedor.isActive) ...[
+                const PopupMenuItem(value: 'editar', child: Text('Editar')),
+                const PopupMenuItem(value: 'eliminar', child: Text('Desactivar', style: TextStyle(color: kAccent))),
+              ] else ...[
+                const PopupMenuItem(value: 'reactivar', child: Text('Reactivar', style: TextStyle(color: Colors.green))),
+                const PopupMenuItem(value: 'eliminar_permanente', child: Text('Eliminar Definitivamente', style: TextStyle(color: Colors.red))),
+              ],
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeletePermanently(BuildContext context, WidgetRef ref, Proveedor p) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar Definitivamente'),
+        content: Text('¿Deseas eliminar a "${p.empresa}" permanentemente? Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () {
+              ref.read(proveedoresProvider.notifier).eliminarProveedorPermanentemente(p.id);
+              Navigator.pop(ctx);
+            },
+            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),

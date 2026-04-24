@@ -2,25 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:uuid/uuid.dart';
-
-import '../../data/datasources/database_helper.dart';
 import '../providers/fiado_provider.dart';
 import '../theme/app_colors.dart';
 import 'detalle_cliente_screen.dart';
+import 'nuevo_cliente_screen.dart';
 import '../widgets/klip_header.dart';
 
-class FiadosScreen extends ConsumerWidget {
+class FiadosScreen extends ConsumerStatefulWidget {
   const FiadosScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FiadosScreen> createState() => _FiadosScreenState();
+}
+
+class _FiadosScreenState extends ConsumerState<FiadosScreen> {
+  bool _showingInactive = false;
+  bool _isBalanceVisible = true;
+
+  @override
+  Widget build(BuildContext context) {
     final clientesAsync = ref.watch(clientesProvider);
     final statsAsync = ref.watch(carteraStatsProvider);
     final currency = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF121212) : kBg;
+    final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FA);
     final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
     final subColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
@@ -35,7 +41,7 @@ class FiadosScreen extends ConsumerWidget {
 
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 children: [
                   statsAsync.when(
                     loading: () => const SizedBox.shrink(),
@@ -46,6 +52,10 @@ class FiadosScreen extends ConsumerWidget {
                       cardColor: cardColor,
                       textColor: textColor,
                       subColor: subColor,
+                      showingInactive: _showingInactive,
+                      isBalanceVisible: _isBalanceVisible,
+                      onToggleInactive: () => setState(() => _showingInactive = !_showingInactive),
+                      onToggleBalance: () => setState(() => _isBalanceVisible = !_isBalanceVisible),
                     ),
                   ),
 
@@ -53,20 +63,23 @@ class FiadosScreen extends ConsumerWidget {
 
                   Row(
                     children: [
-                      Container(
+                      const SizedBox(
                         width: 4,
                         height: 18,
-                        decoration: BoxDecoration(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
                             color: kAccent,
-                            borderRadius: BorderRadius.circular(4)),
+                            borderRadius: BorderRadius.all(Radius.circular(4)),
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Listado de Clientes',
+                        _showingInactive ? 'Clientes Desactivados' : 'Listado de Clientes',
                         style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: textColor),
+                            color: _showingInactive ? Colors.grey : textColor),
                       ),
                     ],
                   ),
@@ -77,11 +90,12 @@ class FiadosScreen extends ConsumerWidget {
                         child: CircularProgressIndicator(color: kAccent)),
                     error: (e, _) => Center(child: Text('Error: $e')),
                     data: (clientes) {
-                      if (clientes.isEmpty) {
-                        return _EmptyClientes(subColor: subColor);
+                      final filtered = clientes.where((c) => c.isActive == !_showingInactive).toList();
+                      if (filtered.isEmpty) {
+                        return _EmptyClientes(subColor: subColor, showingInactive: _showingInactive);
                       }
                       return Column(
-                        children: clientes
+                        children: filtered
                             .map((c) => _ClienteTile(
                                   cliente: c,
                                   cardColor: cardColor,
@@ -93,8 +107,12 @@ class FiadosScreen extends ConsumerWidget {
                                           builder: (_) =>
                                               DetalleClienteScreen(
                                                   cliente: c))),
-                                  onEdit: () => _showEditDialog(
-                                      context, ref, c),
+                                  onEdit: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (_) =>
+                                              NuevoClienteScreen(
+                                                  clienteAEditar: c))),
                                 ))
                             .toList(),
                       );
@@ -111,195 +129,12 @@ class FiadosScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton(
         backgroundColor: kAccent,
         foregroundColor: Colors.white,
-        onPressed: () => _showNuevoClienteSheet(context, ref),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const NuevoClienteScreen()),
+        ),
         child: const Icon(Icons.add, size: 28),
       ),
-    );
-  }
-
-  void _showNuevoClienteSheet(BuildContext context, WidgetRef ref) {
-    final formKey = GlobalKey<FormState>();
-    final nombreCtrl = TextEditingController();
-    final telefonoCtrl = TextEditingController();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final textColor = isDark ? Colors.white : Colors.black87;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: cardColor,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom,
-            left: 20,
-            right: 20,
-            top: 20),
-        child: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                        color: Colors.grey[400],
-                        borderRadius: BorderRadius.circular(4))),
-              ),
-              const SizedBox(height: 16),
-              Text('Nuevo Cliente',
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: textColor)),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: nombreCtrl,
-                style: TextStyle(color: textColor),
-                decoration: _inputDeco('Nombre completo *', Icons.person, textColor),
-                textCapitalization: TextCapitalization.words,
-                validator: (v) => v == null || v.trim().isEmpty ? 'Requerido' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: telefonoCtrl,
-                style: TextStyle(color: textColor),
-                decoration: _inputDeco('Teléfono *', Icons.phone, textColor),
-                keyboardType: TextInputType.phone,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (v) => v == null || v.length < 10 ? 'Mínimo 10 dígitos' : null,
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: kAccent,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14))),
-                  onPressed: () async {
-                    if (!formKey.currentState!.validate()) return;
-                    final db = await DatabaseHelper.instance.database;
-                    await db.insert('clientes', {
-                      'id': const Uuid().v4(),
-                      'nombre': nombreCtrl.text.trim(),
-                      'telefono': telefonoCtrl.text.trim(),
-                    });
-                    ref.invalidate(clientesProvider);
-                    ref.invalidate(carteraStatsProvider);
-                    if (ctx.mounted) Navigator.pop(ctx);
-                  },
-                  child: const Text('Registrar Cliente',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showEditDialog(BuildContext context, WidgetRef ref, Cliente c) {
-    final nombreCtrl = TextEditingController(text: c.nombre);
-    final telefonoCtrl = TextEditingController(text: c.telefono ?? '');
-    final formKey = GlobalKey<FormState>();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black87;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Editar Cliente',
-            style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nombreCtrl,
-                style: TextStyle(color: textColor),
-                decoration: _inputDeco('Nombre', Icons.person, textColor),
-                validator: (v) => v == null || v.trim().isEmpty ? 'Requerido' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: telefonoCtrl,
-                style: TextStyle(color: textColor),
-                decoration: _inputDeco('Teléfono', Icons.phone, textColor),
-                keyboardType: TextInputType.phone,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: kAccent, foregroundColor: Colors.white),
-            onPressed: () async {
-              if (!formKey.currentState!.validate()) return;
-              await ref.read(clientesProvider.notifier).editarCliente(
-                    c.id,
-                    nombreCtrl.text.trim(),
-                    telefonoCtrl.text.trim(),
-                  );
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Actualizar'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final confirm = await showDialog<bool>(
-                context: ctx,
-                builder: (c2) => AlertDialog(
-                  title: const Text('Desactivar Cliente'),
-                  content: const Text('¿Estás seguro de desactivar este cliente? No aparecerá en la lista principal.'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(c2, false), child: const Text('Cancelar')),
-                    TextButton(onPressed: () => Navigator.pop(c2, true), child: const Text('Desactivar', style: TextStyle(color: kAccent))),
-                  ],
-                ),
-              );
-              if (confirm == true) {
-                final error = await ref.read(clientesProvider.notifier).desactivarCliente(c.id);
-                if (ctx.mounted) {
-                  if (error != null) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.orange));
-                  } else {
-                    Navigator.pop(ctx);
-                  }
-                }
-              }
-            },
-            child: const Text('Desactivar', style: TextStyle(color: kAccent)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  InputDecoration _inputDeco(String label, IconData icon, Color textColor) {
-    return InputDecoration(
-      labelText: label,
-      labelStyle: TextStyle(color: textColor),
-      prefixIcon: Icon(icon, color: textColor),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
   }
 }
@@ -310,6 +145,10 @@ class _CarteraCard extends StatelessWidget {
   final Color cardColor;
   final Color textColor;
   final Color subColor;
+  final bool showingInactive;
+  final bool isBalanceVisible;
+  final VoidCallback onToggleInactive;
+  final VoidCallback onToggleBalance;
 
   const _CarteraCard({
     required this.stats,
@@ -317,18 +156,22 @@ class _CarteraCard extends StatelessWidget {
     required this.cardColor,
     required this.textColor,
     required this.subColor,
+    required this.showingInactive,
+    required this.isBalanceVisible,
+    required this.onToggleInactive,
+    required this.onToggleBalance,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withOpacity(0.04),
               blurRadius: 10,
               offset: const Offset(0, 4))
         ],
@@ -339,31 +182,52 @@ class _CarteraCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Gestión de Cartera',
+              Text('Gestión de\nCartera',
                   style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 22,
                       fontWeight: FontWeight.w900,
+                      height: 1.2,
                       color: textColor)),
-              Icon(Icons.remove_red_eye_outlined, color: subColor),
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: onToggleBalance,
+                    child: Icon(
+                      isBalanceVisible ? Icons.analytics : Icons.analytics_outlined,
+                      color: subColor,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  GestureDetector(
+                    onTap: onToggleInactive,
+                    child: Icon(
+                      showingInactive ? Icons.visibility : Icons.visibility_off_outlined,
+                      color: showingInactive ? kAccent : subColor,
+                      size: 22,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           Row(
             children: [
-              _CarteraStat(
+              _StatItem(
                   label: 'Clientes',
                   value: stats.totalClientes.toString(),
                   icon: Icons.people_alt_rounded,
                   color: Colors.green),
               const SizedBox(width: 40),
-              _CarteraStat(
+              _StatItem(
                   label: 'Con Deuda',
                   value: stats.clientesConDeuda.toString(),
                   icon: Icons.receipt_long,
                   color: kAccent),
             ],
           ),
-          const Divider(height: 28),
+          const Divider(height: 32),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -374,7 +238,7 @@ class _CarteraCard extends StatelessWidget {
                       style: TextStyle(color: subColor, fontSize: 13)),
                   const SizedBox(height: 4),
                   Text(
-                    currency.format(stats.deudaTotal),
+                    isBalanceVisible ? currency.format(stats.deudaTotal) : '******',
                     style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
@@ -397,13 +261,13 @@ class _CarteraCard extends StatelessWidget {
   }
 }
 
-class _CarteraStat extends StatelessWidget {
+class _StatItem extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
   final Color color;
 
-  const _CarteraStat({required this.label, required this.value, required this.icon, required this.color});
+  const _StatItem({required this.label, required this.value, required this.icon, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -427,7 +291,7 @@ class _CarteraStat extends StatelessWidget {
                     fontWeight: FontWeight.w600)),
           ],
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
         Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
       ],
     );
@@ -545,35 +409,70 @@ class _ClienteTile extends ConsumerWidget {
             if (v == 'editar') onEdit();
             if (v == 'desactivar') {
                final error = await ref.read(clientesProvider.notifier).desactivarCliente(cliente.id);
-               if (error != null) {
-                 if (context.mounted) {
-                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.orange));
-                 }
+               if (error != null && context.mounted) {
+                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.orange));
                }
             }
+            if (v == 'reactivar') {
+              await ref.read(clientesProvider.notifier).reactivarCliente(cliente.id);
+            }
+            if (v == 'eliminar') {
+              if (!context.mounted) return;
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (c2) => AlertDialog(
+                  title: const Text('Eliminar Cliente'),
+                  content: const Text('¿Estás seguro de eliminar este cliente permanentemente? Esta acción no se puede deshacer.'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(c2, false), child: const Text('Cancelar')),
+                    TextButton(onPressed: () => Navigator.pop(c2, true), child: const Text('Eliminar', style: TextStyle(color: Colors.red))),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                await ref.read(clientesProvider.notifier).eliminarClientePermanentemente(cliente.id);
+              }
+            }
           },
-          itemBuilder: (_) => const [
-            PopupMenuItem(
-                value: 'ver',
-                child: Row(children: [
-                  Icon(Icons.payment, size: 20),
-                  SizedBox(width: 8),
-                  Text('Cobrar / Ver')
-                ])),
-            PopupMenuItem(
-                value: 'editar',
-                child: Row(children: [
-                  Icon(Icons.edit_outlined, size: 20),
-                  SizedBox(width: 8),
-                  Text('Editar')
-                ])),
-            PopupMenuItem(
-                value: 'desactivar',
-                child: Row(children: [
-                  Icon(Icons.person_off_outlined, size: 20, color: kAccent),
-                  SizedBox(width: 8),
-                  Text('Desactivar', style: TextStyle(color: kAccent))
-                ])),
+          itemBuilder: (_) => [
+            if (cliente.isActive) ...[
+              const PopupMenuItem(
+                  value: 'ver',
+                  child: const Row(children: [
+                    Icon(Icons.payment, size: 20),
+                    SizedBox(width: 8),
+                    Text('Cobrar / Ver')
+                  ])),
+              const PopupMenuItem(
+                  value: 'editar',
+                  child: const Row(children: [
+                    Icon(Icons.edit_outlined, size: 20),
+                    SizedBox(width: 8),
+                    Text('Editar')
+                  ])),
+              const PopupMenuItem(
+                  value: 'desactivar',
+                  child: const Row(children: [
+                    Icon(Icons.person_off_outlined, size: 20, color: kAccent),
+                    SizedBox(width: 8),
+                    Text('Desactivar', style: TextStyle(color: kAccent))
+                  ])),
+            ] else ...[
+              const PopupMenuItem(
+                  value: 'reactivar',
+                  child: const Row(children: [
+                    Icon(Icons.check_circle_outline, size: 20, color: Colors.green),
+                    SizedBox(width: 8),
+                    Text('Reactivar')
+                  ])),
+              const PopupMenuItem(
+                  value: 'eliminar',
+                  child: const Row(children: [
+                    Icon(Icons.delete_forever, size: 20, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Eliminar Definitivamente', style: TextStyle(color: Colors.red))
+                  ])),
+            ],
           ],
         ),
         onTap: onTap,
@@ -584,8 +483,9 @@ class _ClienteTile extends ConsumerWidget {
 
 class _EmptyClientes extends StatelessWidget {
   final Color subColor;
+  final bool showingInactive;
 
-  const _EmptyClientes({required this.subColor});
+  const _EmptyClientes({required this.subColor, this.showingInactive = false});
 
   @override
   Widget build(BuildContext context) {
@@ -594,15 +494,15 @@ class _EmptyClientes extends StatelessWidget {
       child: Center(
         child: Column(
           children: [
-            Icon(Icons.people_outline, size: 64, color: subColor),
+            Icon(showingInactive ? Icons.person_off_outlined : Icons.people_outline, size: 64, color: subColor),
             const SizedBox(height: 12),
-            Text('No hay clientes registrados',
+            Text(showingInactive ? 'No hay clientes desactivados' : 'No hay clientes registrados',
                 style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                     color: subColor)),
             const SizedBox(height: 8),
-            Text('Toca el botón + para registrar\nun nuevo cliente',
+            Text(showingInactive ? 'Los clientes que desactives aparecerán aquí.' : 'Toca el botón + para registrar\nun nuevo cliente',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: subColor, fontSize: 13)),
           ],

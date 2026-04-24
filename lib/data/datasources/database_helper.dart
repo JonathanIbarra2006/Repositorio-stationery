@@ -19,7 +19,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 6,
+      version: 7,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -72,6 +72,7 @@ class DatabaseHelper {
         id TEXT PRIMARY KEY,
         nombre TEXT NOT NULL,
         telefono TEXT,
+        email TEXT,
         is_active INTEGER DEFAULT 1
       )
     ''');
@@ -119,6 +120,11 @@ class DatabaseHelper {
     if (oldVersion < 6) {
       await db.execute(
         'ALTER TABLE transacciones ADD COLUMN cliente_id TEXT',
+      );
+    }
+    if (oldVersion < 7) {
+      await db.execute(
+        'ALTER TABLE clientes ADD COLUMN email TEXT',
       );
     }
   }
