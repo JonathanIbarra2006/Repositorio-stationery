@@ -5,20 +5,24 @@ import '../datasources/database_helper.dart';
 class ProductRepository {
   final dbHelper = DatabaseHelper.instance;
 
-  Future<List<Product>> getProducts({String? query}) async {
+  Future<List<Product>> getProducts({String? query, bool includeInactive = false}) async {
     final db = await dbHelper.database;
     List<Map<String, dynamic>> maps;
 
+    String whereClause = includeInactive ? '1=1' : 'is_active = 1';
+    List<dynamic> whereArgs = [];
+
     if (query != null && query.isNotEmpty) {
-      maps = await db.query(
-        'productos',
-        where: '(nombre LIKE ? OR codigo_barras LIKE ?) AND is_active = 1', // Buscamos por nombre O código, y solo activos
-        whereArgs: ['%$query%', '%$query%'],
-        orderBy: 'nombre ASC',
-      );
-    } else {
-      maps = await db.query('productos', where: 'is_active = 1', orderBy: 'nombre ASC');
+      whereClause += ' AND (nombre LIKE ? OR codigo_barras LIKE ?)';
+      whereArgs.addAll(['%$query%', '%$query%']);
     }
+
+    maps = await db.query(
+      'productos',
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: 'nombre ASC',
+    );
 
     return List.generate(maps.length, (i) => Product.fromMap(maps[i]));
   }
@@ -41,6 +45,23 @@ class ProductRepository {
     await db.update(
         'productos',
         {'is_active': 0},
+        where: 'id = ?',
+        whereArgs: [id]);
+  }
+
+  Future<void> reactivateProduct(String id) async {
+    final db = await dbHelper.database;
+    await db.update(
+        'productos',
+        {'is_active': 1},
+        where: 'id = ?',
+        whereArgs: [id]);
+  }
+
+  Future<void> deleteProductPermanently(String id) async {
+    final db = await dbHelper.database;
+    await db.delete(
+        'productos',
         where: 'id = ?',
         whereArgs: [id]);
   }

@@ -12,10 +12,10 @@ class ProductNotifier extends StateNotifier<AsyncValue<List<Product>>> {
     loadProducts();
   }
 
-  Future<void> loadProducts({String? query}) async {
+  Future<void> loadProducts({String? query, bool includeInactive = true}) async {
     state = const AsyncValue.loading();
     try {
-      final products = await _repository.getProducts(query: query);
+      final products = await _repository.getProducts(query: query, includeInactive: includeInactive);
       state = AsyncValue.data(products);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
@@ -43,6 +43,26 @@ class ProductNotifier extends StateNotifier<AsyncValue<List<Product>>> {
       return null;
     } catch (e) {
       return 'Error al desactivar el producto.';
+    }
+  }
+
+  Future<String?> reactivateProduct(String id) async {
+    try {
+      await _repository.reactivateProduct(id);
+      loadProducts();
+      return null;
+    } catch (e) {
+      return 'Error al reactivar el producto.';
+    }
+  }
+
+  Future<String?> deleteProductPermanently(String id) async {
+    try {
+      await _repository.deleteProductPermanently(id);
+      loadProducts();
+      return null;
+    } catch (e) {
+      return 'Error al eliminar el producto.';
     }
   }
   Future<String?> editProduct(Product product) async {

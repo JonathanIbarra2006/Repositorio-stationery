@@ -17,10 +17,10 @@ class HomeScreen extends ConsumerWidget {
     final transactionsAsync = ref.watch(transactionsProvider);
     final currency = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FA);
+    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
     final subColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final bgColor = isDark ? const Color(0xFF121212) : kBg;
 
     final dateRange = ref.watch(dateRangeProvider);
 
@@ -44,7 +44,7 @@ class HomeScreen extends ConsumerWidget {
                   final ultimos = recientes.take(10).toList();
 
                   return ListView(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     children: [
                       _SummaryCard(
                         cardColor: cardColor,
@@ -83,11 +83,11 @@ class HomeScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 24),
                       Container(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
                           color: cardColor,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
                         ),
                         child: FlowChart(
                           transactions: transactions,
@@ -136,8 +136,8 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))]),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))]),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -155,11 +155,14 @@ class _SummaryCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          Row(children: [const _StatPill(label: 'Ventas Totales', icon: Icons.trending_up, color: Colors.green), const SizedBox(width: 32), const _StatPill(label: 'Gastos Totales', icon: Icons.trending_down, color: kAccent)]),
-          const SizedBox(height: 6),
-          Row(children: [Text(currency.format(ingresos), style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textColor)), const SizedBox(width: 40), Text(currency.format(gastos), style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textColor))]),
-          const Divider(height: 28),
+          Row(
+            children: [
+              _StatItem(label: 'Ventas Totales', value: currency.format(ingresos), icon: Icons.trending_up, color: Colors.green),
+              const SizedBox(width: 32),
+              _StatItem(label: 'Gastos Totales', value: currency.format(gastos), icon: Icons.trending_down, color: kAccent),
+            ],
+          ),
+          const Divider(height: 32),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -173,14 +176,22 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _StatPill extends StatelessWidget {
+class _StatItem extends StatelessWidget {
   final String label;
+  final String value;
   final IconData icon;
   final Color color;
-  const _StatPill({required this.label, required this.icon, required this.color});
+  const _StatItem({required this.label, required this.value, required this.icon, required this.color});
   @override
   Widget build(BuildContext context) {
-    return Row(children: [Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(6)), child: Icon(icon, color: color, size: 14)), const SizedBox(width: 6), Text(label, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w600))]);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(6)), child: Icon(icon, color: color, size: 14)), const SizedBox(width: 6), Text(label, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w600))]),
+        const SizedBox(height: 8),
+        Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+      ],
+    );
   }
 }
 

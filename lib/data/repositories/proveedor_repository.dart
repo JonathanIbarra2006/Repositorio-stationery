@@ -5,9 +5,10 @@ class ProveedorRepository {
   final dbHelper = DatabaseHelper.instance;
 
   // Gets all proveedores
-  Future<List<Proveedor>> getProveedores() async {
+  Future<List<Proveedor>> getProveedores({bool includeInactive = false}) async {
     final db = await dbHelper.database;
-    final maps = await db.query('proveedores', where: 'is_active = 1', orderBy: 'empresa ASC');
+    final whereClause = includeInactive ? null : 'is_active = 1';
+    final maps = await db.query('proveedores', where: whereClause, orderBy: 'empresa ASC');
     return List.generate(maps.length, (i) => Proveedor.fromMap(maps[i]));
   }
 
@@ -24,5 +25,15 @@ class ProveedorRepository {
   Future<void> desactivarProveedor(String id) async {
     final db = await dbHelper.database;
     await db.update('proveedores', {'is_active': 0}, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> reactivarProveedor(String id) async {
+    final db = await dbHelper.database;
+    await db.update('proveedores', {'is_active': 1}, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> eliminarProveedorPermanentemente(String id) async {
+    final db = await dbHelper.database;
+    await db.delete('proveedores', where: 'id = ?', whereArgs: [id]);
   }
 }

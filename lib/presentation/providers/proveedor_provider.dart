@@ -11,10 +11,10 @@ class ProveedorNotifier extends StateNotifier<AsyncValue<List<Proveedor>>> {
     loadProveedores();
   }
 
-  Future<void> loadProveedores() async {
+  Future<void> loadProveedores({bool includeInactive = true}) async {
     state = const AsyncValue.loading();
     try {
-      final proveedores = await _repository.getProveedores();
+      final proveedores = await _repository.getProveedores(includeInactive: includeInactive);
       state = AsyncValue.data(proveedores);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
@@ -33,6 +33,16 @@ class ProveedorNotifier extends StateNotifier<AsyncValue<List<Proveedor>>> {
 
   Future<void> desactivarProveedor(String id) async {
     await _repository.desactivarProveedor(id);
+    loadProveedores();
+  }
+
+  Future<void> reactivarProveedor(String id) async {
+    await _repository.reactivarProveedor(id);
+    loadProveedores();
+  }
+
+  Future<void> eliminarProveedorPermanentemente(String id) async {
+    await _repository.eliminarProveedorPermanentemente(id);
     loadProveedores();
   }
 }

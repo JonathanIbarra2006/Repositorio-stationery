@@ -28,7 +28,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF2F2F7);
+    final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FA);
     final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
     final subColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
@@ -207,40 +207,125 @@ class _FinancialSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 20, offset: const Offset(0, 8))]),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4))
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Resumen\nFinanciero', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, height: 1.1, color: textColor)),
-              GestureDetector(onTap: onDateTap, child: Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8), decoration: BoxDecoration(color: const Color(0xFFEF4063).withOpacity(0.08), borderRadius: BorderRadius.circular(20)), child: Row(children: [const Icon(Icons.calendar_today_rounded, color: Color(0xFFEF4063), size: 14), const SizedBox(width: 8), Text(dateLabel, style: const TextStyle(color: Color(0xFFEF4063), fontWeight: FontWeight.bold, fontSize: 13))]))),
+              Text('Resumen\nFinanciero',
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      height: 1.2,
+                      color: textColor)),
+              GestureDetector(
+                onTap: onDateTap,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFEF4063).withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(20)),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today_rounded, color: Color(0xFFEF4063), size: 14),
+                      const SizedBox(width: 8),
+                      Text(dateLabel, style: const TextStyle(color: Color(0xFFEF4063), fontWeight: FontWeight.bold, fontSize: 13))
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 24),
-          Row(children: [_MiniStat(label: 'Ingresos', amount: state.totalIngresos, color: Colors.green, currency: currency), const SizedBox(width: 24), _MiniStat(label: 'Egresos', amount: state.totalGastos, color: const Color(0xFFEF4063), currency: currency)]),
-          const SizedBox(height: 32),
-          Text('Balance Neto', style: TextStyle(color: subColor, fontSize: 14, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 4),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(currency.format(state.balance), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: state.balance >= 0 ? Colors.green : const Color(0xFFEF4063))), Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFFEF4063).withOpacity(0.05), shape: BoxShape.circle), child: const Icon(Icons.trending_up, color: Color(0xFFEF4063), size: 20))]),
+          Row(
+            children: [
+              _StatItem(
+                label: 'Ingresos',
+                value: currency.format(state.totalIngresos),
+                icon: Icons.arrow_downward,
+                color: Colors.green,
+              ),
+              const SizedBox(width: 40),
+              _StatItem(
+                label: 'Egresos',
+                value: currency.format(state.totalGastos),
+                icon: Icons.arrow_upward,
+                color: const Color(0xFFEF4063),
+              ),
+            ],
+          ),
+          const Divider(height: 32),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Balance Neto', style: TextStyle(color: subColor, fontSize: 13)),
+                  const SizedBox(height: 4),
+                  Text(
+                    currency.format(state.balance),
+                    style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: state.balance >= 0 ? Colors.green : const Color(0xFFEF4063)),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: const Color(0xFFEF4063).withOpacity(0.05), shape: BoxShape.circle),
+                child: const Icon(Icons.trending_up, color: Color(0xFFEF4063), size: 20),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _MiniStat extends StatelessWidget {
+class _StatItem extends StatelessWidget {
   final String label;
-  final double amount;
+  final String value;
   final Color color;
-  final NumberFormat currency;
-  const _MiniStat({required this.label, required this.amount, required this.color, required this.currency});
+  final IconData icon;
+
+  const _StatItem({required this.label, required this.value, required this.color, required this.icon});
+
   @override
   Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(6)), child: Icon(Icons.arrow_upward, color: color, size: 10)), const SizedBox(width: 8), Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13))]), const SizedBox(height: 8), Text(currency.format(amount), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900))]);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(6)),
+              child: Icon(icon, color: color, size: 10),
+            ),
+            const SizedBox(width: 8),
+            Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+      ],
+    );
   }
 }
 

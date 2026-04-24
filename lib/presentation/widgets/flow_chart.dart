@@ -85,15 +85,20 @@ class FlowChart extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              range == null ? 'Tendencia (Últimos 7 días)' : 'Tendencia del Periodo',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black87,
+            Expanded(
+              child: Text(
+                range == null ? 'Tendencia (Últimos 7 días)' : 'Tendencia del Periodo',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
+            const SizedBox(width: 8),
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 _Indicator(color: Colors.green, text: 'Ingresos'),
                 const SizedBox(width: 12),

@@ -2,16 +2,24 @@ class Cliente {
   final String id;
   final String nombre;
   final String? telefono;
+  final String? email;
   final bool isActive;
 
-  Cliente({required this.id, required this.nombre, this.telefono, this.isActive = true});
+  Cliente({required this.id, required this.nombre, this.telefono, this.email, this.isActive = true});
 
-  Map<String, dynamic> toMap() => {'id': id, 'nombre': nombre, 'telefono': telefono, 'is_active': isActive ? 1 : 0};
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'nombre': nombre,
+    'telefono': telefono,
+    'email': email,
+    'is_active': isActive ? 1 : 0
+  };
 
   factory Cliente.fromMap(Map<String, dynamic> map) => Cliente(
       id: map['id'],
       nombre: map['nombre'],
       telefono: map['telefono'],
+      email: map['email'],
       isActive: map['is_active'] == null || map['is_active'] == 1,
   );
 

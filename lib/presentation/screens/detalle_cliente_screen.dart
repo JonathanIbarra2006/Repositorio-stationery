@@ -6,6 +6,7 @@ import '../providers/fiado_provider.dart';
 import '../providers/transaction_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/klip_header.dart';
+import 'nuevo_cliente_screen.dart';
 
 class DetalleClienteScreen extends ConsumerStatefulWidget {
   final Cliente cliente;
@@ -17,16 +18,6 @@ class DetalleClienteScreen extends ConsumerStatefulWidget {
 }
 
 class _DetalleClienteScreenState extends ConsumerState<DetalleClienteScreen> {
-  late String _nombreActual;
-  late String _telefonoActual;
-
-  @override
-  void initState() {
-    super.initState();
-    _nombreActual = widget.cliente.nombre;
-    _telefonoActual = widget.cliente.telefono ?? '';
-  }
-
   @override
   Widget build(BuildContext context) {
     final currency = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
@@ -37,6 +28,11 @@ class _DetalleClienteScreenState extends ConsumerState<DetalleClienteScreen> {
     final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
     final subColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
+
+    final clienteActual = ref.watch(clientesProvider).maybeWhen(
+          data: (list) => list.firstWhere((c) => c.id == widget.cliente.id, orElse: () => widget.cliente),
+          orElse: () => widget.cliente,
+        );
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -49,7 +45,14 @@ class _DetalleClienteScreenState extends ConsumerState<DetalleClienteScreen> {
               actions: [
                 IconButton(
                   icon: const Icon(Icons.edit_outlined, color: kAccent),
-                  onPressed: _mostrarDialogoEditar,
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => NuevoClienteScreen(clienteAEditar: clienteActual),
+                      ),
+                    );
+                  },
                 )
               ],
             ),
@@ -89,21 +92,28 @@ class _DetalleClienteScreenState extends ConsumerState<DetalleClienteScreen> {
                               radius: 35,
                               backgroundColor: kAccent.withOpacity(0.1),
                               child: Text(
-                                _nombreActual.isNotEmpty ? _nombreActual[0].toUpperCase() : '?',
+                                clienteActual.nombre.isNotEmpty ? clienteActual.nombre[0].toUpperCase() : '?',
                                 style: const TextStyle(color: kAccent, fontSize: 32, fontWeight: FontWeight.w900),
                               ),
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              _nombreActual,
+                              clienteActual.nombre,
                               textAlign: TextAlign.center,
                               style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textColor),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _telefonoActual.isNotEmpty ? _telefonoActual : 'Sin teléfono',
+                              clienteActual.telefono?.isNotEmpty == true ? clienteActual.telefono! : 'Sin teléfono',
                               style: TextStyle(color: subColor, fontSize: 14, fontWeight: FontWeight.w500),
                             ),
+                            if (clienteActual.email?.isNotEmpty == true) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                clienteActual.email!,
+                                style: TextStyle(color: subColor, fontSize: 13),
+                              ),
+                            ],
                             const Divider(height: 32),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -154,7 +164,7 @@ class _DetalleClienteScreenState extends ConsumerState<DetalleClienteScreen> {
                           cardColor: cardColor,
                           textColor: textColor,
                           subColor: subColor,
-                          onAbonar: () => _mostrarModalAbono(d),
+                          onAbonar: () => _mostrarModalAbono(d, clienteActual.nombre),
                         )),
                       
                       const SizedBox(height: 80),
@@ -185,7 +195,7 @@ class _DetalleClienteScreenState extends ConsumerState<DetalleClienteScreen> {
   }
 
   // --- MODAL DE ABONOS ---
-  void _mostrarModalAbono(FiadoDetalle d) {
+  void _mostrarModalAbono(FiadoDetalle d, String nombreCliente) {
     final currency = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
     final montoCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -265,7 +275,7 @@ class _DetalleClienteScreenState extends ConsumerState<DetalleClienteScreen> {
                     abono: abono,
                     totalDeuda: d.total,
                     loQueYaPago: d.montoPagado,
-                    nombreCliente: _nombreActual
+                    nombreCliente: nombreCliente
                   );
                   ref.invalidate(transactionsProvider);
                   if (mounted) {
@@ -280,70 +290,6 @@ class _DetalleClienteScreenState extends ConsumerState<DetalleClienteScreen> {
           ],
         );
       },
-    );
-  }
-
-  void _mostrarDialogoEditar() {
-    final nombreCtrl = TextEditingController(text: _nombreActual);
-    final telCtrl = TextEditingController(text: _telefonoActual);
-    final formKey = GlobalKey<FormState>();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        title: const Text('Editar Cliente', style: TextStyle(fontWeight: FontWeight.w900)),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nombreCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Nombre Completo',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                validator: (v) => v == null || v.trim().isEmpty ? 'Requerido' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: telCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Teléfono',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                keyboardType: TextInputType.phone,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (v) => v == null || v.length < 10 ? 'Mínimo 10 dígitos' : null,
-              )
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kAccent,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                await ref.read(clientesProvider.notifier).editarCliente(widget.cliente.id, nombreCtrl.text.trim(), telCtrl.text.trim());
-                setState(() { 
-                  _nombreActual = nombreCtrl.text.trim(); 
-                  _telefonoActual = telCtrl.text.trim(); 
-                });
-                if (mounted) Navigator.pop(ctx);
-              }
-            }, 
-            child: const Text('Guardar', style: TextStyle(fontWeight: FontWeight.bold))
-          )
-        ],
-      ),
     );
   }
 }
