@@ -80,7 +80,7 @@ class _DetalleClienteScreenState extends ConsumerState<DetalleClienteScreen> {
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
+                              color: Colors.black.withValues(alpha: 0.04),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -90,7 +90,7 @@ class _DetalleClienteScreenState extends ConsumerState<DetalleClienteScreen> {
                           children: [
                             CircleAvatar(
                               radius: 35,
-                              backgroundColor: kAccent.withOpacity(0.1),
+                              backgroundColor: kAccent.withValues(alpha: 0.1),
                               child: Text(
                                 clienteActual.nombre.isNotEmpty ? clienteActual.nombre[0].toUpperCase() : '?',
                                 style: const TextStyle(color: kAccent, fontSize: 32, fontWeight: FontWeight.w900),
@@ -185,7 +185,7 @@ class _DetalleClienteScreenState extends ConsumerState<DetalleClienteScreen> {
         padding: const EdgeInsets.symmetric(vertical: 40),
         child: Column(
           children: [
-            Icon(Icons.history, size: 64, color: color.withOpacity(0.3)),
+            Icon(Icons.history, size: 64, color: color.withValues(alpha: 0.3)),
             const SizedBox(height: 16),
             Text('No hay fiados registrados', style: TextStyle(color: color, fontWeight: FontWeight.w600)),
           ],
@@ -216,7 +216,7 @@ class _DetalleClienteScreenState extends ConsumerState<DetalleClienteScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: kAccent.withOpacity(0.05),
+                    color: kAccent.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
@@ -270,6 +270,9 @@ class _DetalleClienteScreenState extends ConsumerState<DetalleClienteScreen> {
               onPressed: () async {
                 if (formKey.currentState!.validate()) {
                   final abono = double.parse(montoCtrl.text);
+                  final messenger = ScaffoldMessenger.of(context);
+                  final nav = Navigator.of(context);
+
                   await ref.read(clientesProvider.notifier).registrarAbono(
                     fiadoId: d.id,
                     abono: abono,
@@ -278,11 +281,12 @@ class _DetalleClienteScreenState extends ConsumerState<DetalleClienteScreen> {
                     nombreCliente: nombreCliente
                   );
                   ref.invalidate(transactionsProvider);
-                  if (mounted) {
-                    Navigator.pop(ctx);
-                    setState(() {});
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Abono de ${currency.format(abono)} registrado'), backgroundColor: Colors.green));
-                  }
+                  
+                  if (!mounted) return;
+                  
+                  nav.pop();
+                  setState(() {});
+                  messenger.showSnackBar(SnackBar(content: Text('Abono de ${currency.format(abono)} registrado'), backgroundColor: Colors.green));
                 }
               },
               child: const Text('CONFIRMAR PAGO', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -321,13 +325,13 @@ class _DeudaCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: esPendiente ? kAccent.withOpacity(0.1) : Colors.transparent,
+          color: esPendiente ? kAccent.withValues(alpha: 0.1) : Colors.transparent,
           width: 1.5,
         ),
       ),
@@ -346,7 +350,7 @@ class _DeudaCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: esPendiente ? kAccent.withOpacity(0.1) : Colors.green.withOpacity(0.1),
+                    color: esPendiente ? kAccent.withValues(alpha: 0.1) : Colors.green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -380,7 +384,7 @@ class _DeudaCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
                   value: d.montoPagado / d.total,
-                  backgroundColor: kAccent.withOpacity(0.1),
+                  backgroundColor: kAccent.withValues(alpha: 0.1),
                   color: Colors.green,
                   minHeight: 8,
                 ),

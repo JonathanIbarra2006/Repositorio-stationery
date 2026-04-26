@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'home_screen.dart';
 import 'finance_screen.dart';
 import 'inventory_screen.dart';
 import 'proveedores_screen.dart';
 import 'fiados_screen.dart';
+import '../../core/theme/app_theme.dart';
 
 class MainLayout extends ConsumerStatefulWidget {
   const MainLayout({super.key});
@@ -16,8 +16,6 @@ class MainLayout extends ConsumerStatefulWidget {
 
 class _MainLayoutState extends ConsumerState<MainLayout> {
   int _currentIndex = 0;
-
-  static const _accent = Color(0xFFEF4063);
 
   final List<Widget> _screens = const [
     HomeScreen(),        // 0 — Inicio
@@ -39,62 +37,70 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: _buildNavBar(),
+      bottomNavigationBar: _buildNavBar(context),
     );
   }
 
-  Widget _buildNavBar() {
+  Widget _buildNavBar(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = AppColors.electricBlue;
+    
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? AppColors.surfaceDark : Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 16,
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+            blurRadius: 20,
             offset: const Offset(0, -4),
           ),
         ],
       ),
       child: SafeArea(
-        child: SizedBox(
-          height: 60,
+        child: Container(
+          height: 65,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: List.generate(_navItems.length, (i) {
               final isActive = _currentIndex == i;
               final item = _navItems[i];
-              return GestureDetector(
-                onTap: () => setState(() => _currentIndex = i),
-                behavior: HitTestBehavior.opaque,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOut,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isActive
-                        ? _accent.withValues(alpha: 0.10)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isActive ? item.activeIcon : item.icon,
-                        color: isActive ? _accent : Colors.grey[500],
-                        size: 24,
-                      ),
-                      const SizedBox(height: 3),
-                      AnimatedDefaultTextStyle(
-                        duration: const Duration(milliseconds: 200),
-                        style: TextStyle(
-                          color: isActive ? _accent : Colors.transparent,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _currentIndex = i),
+                  behavior: HitTestBehavior.opaque,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOutCubic,
+                    margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? accent.withValues(alpha: 0.12)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isActive ? item.activeIcon : item.icon,
+                          color: isActive ? accent : (isDark ? Colors.grey[600] : Colors.grey[400]),
+                          size: 24,
                         ),
-                        child: Text(item.label),
-                      ),
-                    ],
+                        if (isActive) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            item.label,
+                            style: TextStyle(
+                              color: accent,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
               );

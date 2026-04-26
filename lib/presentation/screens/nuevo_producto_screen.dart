@@ -1,5 +1,4 @@
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,7 +7,8 @@ import 'package:uuid/uuid.dart';
 import '../../domain/models/product.dart';
 import '../providers/product_provider.dart';
 import '../providers/proveedor_provider.dart';
-import 'inventory_screen.dart';
+import '../theme/app_colors.dart';
+import '../widgets/scanner_screen.dart';
 
 class NuevoProductoScreen extends ConsumerStatefulWidget {
   final Product? productoAEditar;
@@ -22,6 +22,7 @@ class NuevoProductoScreen extends ConsumerStatefulWidget {
 class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
   final _formKey = GlobalKey<FormState>();
 
+  // Controladores
   late final TextEditingController _nombreCtrl;
   late final TextEditingController _codigoCtrl;
   late final TextEditingController _cantidadCtrl;
@@ -29,12 +30,11 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
   late final TextEditingController _stockMinimoCtrl;
   late final TextEditingController _manualProveedorCtrl;
 
+  // Estado local
   String? _categoriaSeleccionada;
   String? _proveedorSeleccionado;
   bool _esProveedorManual = false;
-  bool _proveedorInicializado = false;
-
-  static const Color _accentColor = Color(0xFFEF4063);
+  bool _isInitialized = false;
 
   bool get _esEdicion => widget.productoAEditar != null;
 
@@ -42,15 +42,17 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
   void initState() {
     super.initState();
     final p = widget.productoAEditar;
+    
     _nombreCtrl = TextEditingController(text: p?.nombre ?? '');
     _codigoCtrl = TextEditingController(text: p?.codigoBarras ?? '');
     _cantidadCtrl = TextEditingController(text: p != null ? p.stock.toString() : '');
     _precioCtrl = TextEditingController(text: p != null ? p.precio.toStringAsFixed(0) : '');
     _stockMinimoCtrl = TextEditingController(text: p != null ? p.stockMinimo.toString() : '5');
     _manualProveedorCtrl = TextEditingController();
-    
-    const categoriasValidas = ['Papelería', 'Tintas', 'Aseo', 'Dulcería', 'Útiles', 'Tecnología', 'Otros'];
-    if (p != null && categoriasValidas.contains(p.categoria)) {
+
+    // Inicializar categoría
+    const categorias = ['Papelería', 'Tintas', 'Aseo', 'Dulcería', 'Útiles', 'Tecnología', 'Otros'];
+    if (p != null && categorias.contains(p.categoria)) {
       _categoriaSeleccionada = p.categoria;
     } else if (p != null) {
       _categoriaSeleccionada = 'Otros';
@@ -80,37 +82,48 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
     return digits.join();
   }
 
-  Future<void> _guardarProducto() async {
+  Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final proveedorFinal = _esProveedorManual
-        ? _manualProveedorCtrl.text.trim()
-        : _proveedorSeleccionado!;
-
-    final codigoFinal = _codigoCtrl.text.trim().isEmpty ? null : _codigoCtrl.text.trim();
+    final proveedorFinal = _esProveedorManual 
+        ? _manualProveedorCtrl.text.trim() 
+        : (_proveedorSeleccionado ?? 'Sin Proveedor');
 
     final producto = Product(
       id: _esEdicion ? widget.productoAEditar!.id : const Uuid().v4(),
       nombre: _nombreCtrl.text.trim(),
-      categoria: _categoriaSeleccionada!,
-      precio: double.parse(_precioCtrl.text.trim()),
-      stock: int.parse(_cantidadCtrl.text.trim()),
-      codigoBarras: codigoFinal,
+      categoria: _categoriaSeleccionada ?? 'Otros',
+      precio: double.tryParse(_precioCtrl.text.trim()) ?? 0.0,
+      stock: int.tryParse(_cantidadCtrl.text.trim()) ?? 0,
+      codigoBarras: _codigoCtrl.text.trim().isEmpty ? null : _codigoCtrl.text.trim(),
       proveedor: proveedorFinal,
-      stockMinimo: int.parse(_stockMinimoCtrl.text.trim()),
+      stockMinimo: int.tryParse(_stockMinimoCtrl.text.trim()) ?? 5,
     );
 
     try {
+      String? error;
       if (_esEdicion) {
-        await ref.read(productsProvider.notifier).editProduct(producto);
+        error = await ref.read(productsProvider.notifier).editProduct(producto);
       } else {
-        await ref.read(productsProvider.notifier).addProduct(producto);
+        error = await ref.read(productsProvider.notifier).addProduct(producto);
       }
-      if (mounted) Navigator.pop(context);
+
+      if (mounted) {
+        if (error == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Operación exitosa'), backgroundColor: kSuccess),
+          );
+          Navigator.pop(context);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(error), backgroundColor: kError),
+          );
+        }
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error: $e'), backgroundColor: kError),
         );
       }
     }
@@ -118,294 +131,264 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF2F2F7);
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final textColor = isDark ? Colors.white : Colors.black87;
-    final subColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
-
     final proveedoresAsync = ref.watch(proveedoresProvider);
-    final List<String> listaNombres = [];
-    proveedoresAsync.whenData((list) {
-      listaNombres.addAll(list.map((e) => e.empresa));
-    });
-    listaNombres.add('OTRO (Escribir Manualmente)');
-
-    if (_esEdicion && !_proveedorInicializado && listaNombres.isNotEmpty) {
-      _proveedorInicializado = true;
-      final prov = widget.productoAEditar!.proveedor;
-      if (listaNombres.contains(prov)) {
-        _proveedorSeleccionado = prov;
-      } else {
-        _proveedorSeleccionado = 'OTRO (Escribir Manualmente)';
-        _manualProveedorCtrl.text = prov;
-        _esProveedorManual = true;
-      }
-    }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : kNavy;
 
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: isDark ? kNavy : kBg,
       appBar: AppBar(
-        title: Text(
-          _esEdicion ? 'Editar Producto' : 'Nuevo Producto',
-          style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
+        title: Column(
+          children: [
+            Text(_esEdicion ? 'Editar Producto' : 'Nuevo Producto', 
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const Text('CONTROL DE INVENTARIO', 
+              style: TextStyle(fontSize: 10, color: kAccent, letterSpacing: 1.2, fontWeight: FontWeight.bold)),
+          ],
         ),
-        backgroundColor: bgColor,
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        foregroundColor: textColor,
-        centerTitle: false,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: textColor),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-          children: [
-            _InputCard(
-              cardColor: cardColor,
-              child: TextFormField(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionTitle('DATOS BÁSICOS'),
+              _buildTextField(
                 controller: _nombreCtrl,
-                style: TextStyle(color: textColor, fontWeight: FontWeight.w500),
-                decoration: _hint('Nombre', subColor),
-                textCapitalization: TextCapitalization.sentences,
-                validator: (v) => v == null || v.trim().isEmpty ? 'El nombre es requerido' : null,
+                label: 'Nombre del producto *',
+                icon: Icons.inventory_2_outlined,
+                validator: (v) => v == null || v.isEmpty ? 'Requerido' : null,
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _InputCard(
-                    cardColor: cardColor,
-                    child: TextFormField(
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTextField(
                       controller: _codigoCtrl,
-                      style: TextStyle(color: textColor, fontWeight: FontWeight.w500),
-                      decoration: _hint(
-                        'Código de barras (EAN-13)',
-                        subColor,
-                        suffix: IconButton(
-                          icon: const Icon(Icons.qr_code_scanner, color: Colors.blueAccent),
-                          tooltip: 'Escanear',
-                          onPressed: () async {
-                            final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const ScannerScreen()));
-                            if (result != null) {
-                              setState(() => _codigoCtrl.text = result);
-                            }
-                          },
-                        ),
-                      ),
+                      label: 'Código de Barras (EAN-13)',
+                      icon: Icons.qr_code_scanner_rounded,
                       keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      suffix: IconButton(
+                        icon: const Icon(Icons.camera_alt_outlined, color: kAccent),
+                        onPressed: () async {
+                          final res = await Navigator.push(context, MaterialPageRoute(builder: (_) => const ScannerScreen()));
+                          if (res != null) setState(() => _codigoCtrl.text = res);
+                        },
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                SizedBox(
-                  height: 58,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.qr_code, size: 18),
-                    label: const Text('Generar', style: TextStyle(fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _accentColor,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                    ),
+                  const SizedBox(width: 8),
+                  IconButton.filledTonal(
                     onPressed: () => setState(() => _codigoCtrl.text = _generarEAN13()),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _InputCard(
-              cardColor: cardColor,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextFormField(
-                    controller: _cantidadCtrl,
-                    style: TextStyle(color: textColor, fontWeight: FontWeight.w500),
-                    decoration: _hint('Cantidad', subColor),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'La cantidad es requerida';
-                      final n = int.tryParse(v);
-                      if (n == null) return 'Ingrese un número válido';
-                      if (n > 1000) return 'Máximo 1000 unidades';
-                      return null;
-                    },
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16, bottom: 10),
-                    child: Text('Máximo 1000 unidades', style: TextStyle(color: subColor, fontSize: 12)),
+                    icon: const Icon(Icons.auto_awesome_rounded),
+                    style: IconButton.styleFrom(backgroundColor: kAccent.withOpacity(0.1), foregroundColor: kAccent),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 12),
-            _InputCard(
-              cardColor: cardColor,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              
+              const SizedBox(height: 32),
+              _buildSectionTitle('PRECIOS Y STOCK'),
+              Row(
                 children: [
-                  TextFormField(
-                    controller: _precioCtrl,
-                    style: TextStyle(color: textColor, fontWeight: FontWeight.w500),
-                    decoration: _hint('Precio', subColor),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'El precio es requerido';
-                      final n = double.tryParse(v);
-                      if (n == null) return 'Ingrese un monto válido';
-                      if (n > 9000000) return 'Máximo 9,000,000';
-                      return null;
-                    },
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _cantidadCtrl,
+                      label: 'Stock Inicial *',
+                      icon: Icons.layers_outlined,
+                      keyboardType: TextInputType.number,
+                      validator: (v) => v == null || v.isEmpty ? 'Requerido' : null,
+                    ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16, bottom: 10),
-                    child: Text('Máximo 9,000,000', style: TextStyle(color: subColor, fontSize: 12)),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _stockMinimoCtrl,
+                      label: 'Stock Mínimo',
+                      icon: Icons.warning_amber_rounded,
+                      keyboardType: TextInputType.number,
+                    ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 12),
-            _SectionLabel('Categoría', subColor),
-            _InputCard(
-              cardColor: cardColor,
-              child: DropdownButtonFormField<String>(
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _precioCtrl,
+                label: 'Precio de Venta *',
+                icon: Icons.attach_money_rounded,
+                keyboardType: TextInputType.number,
+                validator: (v) => v == null || v.isEmpty ? 'Requerido' : null,
+              ),
+
+              const SizedBox(height: 32),
+              _buildSectionTitle('CATEGORIZACIÓN Y PROVEEDOR'),
+              _buildDropdown(
+                label: 'Categoría *',
+                icon: Icons.category_outlined,
                 value: _categoriaSeleccionada,
-                dropdownColor: cardColor,
-                style: TextStyle(color: textColor),
-                decoration: _hint('', subColor),
-                hint: Text('Seleccione una categoría', style: TextStyle(color: subColor)),
-                isExpanded: true,
-                items: ['Papelería', 'Tintas', 'Aseo', 'Dulcería', 'Útiles', 'Tecnología', 'Otros']
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(color: textColor))))
-                    .toList(),
+                items: ['Papelería', 'Tintas', 'Aseo', 'Dulcería', 'Útiles', 'Tecnología', 'Otros'],
                 onChanged: (v) => setState(() => _categoriaSeleccionada = v),
-                validator: (v) => v == null ? 'Seleccione una categoría' : null,
               ),
-            ),
-            const SizedBox(height: 12),
-            _SectionLabel('Stock Mínimo', subColor),
-            _InputCard(
-              cardColor: cardColor,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextFormField(
-                    controller: _stockMinimoCtrl,
-                    style: TextStyle(color: textColor, fontWeight: FontWeight.w500),
-                    decoration: _hint('', subColor),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Requerido' : null,
+              const SizedBox(height: 16),
+              
+              proveedoresAsync.when(
+                data: (list) {
+                  final nombres = list.map((e) => e.empresa).toSet().toList();
+                  const manualLabel = 'OTRO (Escribir Manualmente)';
+                  if (!nombres.contains(manualLabel)) nombres.add(manualLabel);
+
+                  // Inicializar selección si estamos editando
+                  if (_esEdicion && !_isInitialized) {
+                    _isInitialized = true;
+                    final prov = widget.productoAEditar!.proveedor;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        setState(() {
+                          if (nombres.contains(prov)) {
+                            _proveedorSeleccionado = prov;
+                          } else {
+                            _proveedorSeleccionado = manualLabel;
+                            _manualProveedorCtrl.text = prov;
+                            _esProveedorManual = true;
+                          }
+                        });
+                      }
+                    });
+                  }
+
+                  return Column(
+                    children: [
+                      _buildDropdown(
+                        label: 'Proveedor *',
+                        icon: Icons.business_rounded,
+                        value: nombres.contains(_proveedorSeleccionado) ? _proveedorSeleccionado : null,
+                        items: nombres,
+                        onChanged: (v) => setState(() {
+                          _proveedorSeleccionado = v;
+                          _esProveedorManual = v == manualLabel;
+                        }),
+                      ),
+                      if (_esProveedorManual) ...[
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _manualProveedorCtrl,
+                          label: 'Nombre del Proveedor',
+                          icon: Icons.edit_note_rounded,
+                          validator: (v) => _esProveedorManual && (v == null || v.isEmpty) ? 'Requerido' : null,
+                        ),
+                      ],
+                    ],
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, s) => const Text('Error al cargar proveedores'),
+              ),
+
+              const SizedBox(height: 48),
+              SizedBox(
+                width: double.infinity,
+                height: 60,
+                child: ElevatedButton.icon(
+                  onPressed: _guardar,
+                  icon: Icon(_esEdicion ? Icons.update : Icons.save_rounded),
+                  label: Text(_esEdicion ? 'ACTUALIZAR PRODUCTO' : 'GUARDAR PRODUCTO', 
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kAccent,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16, bottom: 10),
-                    child: Text('Alerta cuando la cantidad baje de este nivel', style: TextStyle(color: subColor, fontSize: 12)),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            _SectionLabel('Proveedor', subColor),
-            _InputCard(
-              cardColor: cardColor,
-              child: DropdownButtonFormField<String>(
-                value: listaNombres.contains(_proveedorSeleccionado) ? _proveedorSeleccionado : null,
-                dropdownColor: cardColor,
-                style: TextStyle(color: textColor),
-                isExpanded: true,
-                decoration: _hint('', subColor),
-                hint: Text('Seleccionar proveedor', style: TextStyle(color: subColor)),
-                items: listaNombres
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis, style: TextStyle(color: textColor))))
-                    .toList(),
-                onChanged: (v) => setState(() {
-                  _proveedorSeleccionado = v;
-                  _esProveedorManual = (v == 'OTRO (Escribir Manualmente)');
-                }),
-                validator: (v) => v == null ? 'Seleccione un proveedor' : null,
-              ),
-            ),
-            if (_esProveedorManual) ...[
-              const SizedBox(height: 12),
-              _InputCard(
-                cardColor: cardColor,
-                child: TextFormField(
-                  controller: _manualProveedorCtrl,
-                  style: TextStyle(color: textColor),
-                  decoration: _hint('Escriba el nombre del proveedor', subColor),
-                  textCapitalization: TextCapitalization.words,
-                  validator: (v) => _esProveedorManual && (v == null || v.trim().isEmpty) ? 'Escriba el nombre' : null,
                 ),
               ),
+              const SizedBox(height: 32),
             ],
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _accentColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                  elevation: 0,
-                ),
-                onPressed: _guardarProducto,
-                child: Text(
-                  _esEdicion ? 'Actualizar producto' : 'Guardar producto',
-                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  InputDecoration _hint(String label, Color subColor, {Widget? suffix}) {
-    return InputDecoration(
-      hintText: label,
-      hintStyle: TextStyle(color: subColor),
-      border: InputBorder.none,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      suffixIcon: suffix,
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12, left: 4),
+      child: Text(title, 
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: kAccent, letterSpacing: 1.1)),
     );
   }
-}
 
-class _InputCard extends StatelessWidget {
-  final Widget child;
-  final Color cardColor;
-  const _InputCard({required this.child, required this.cardColor});
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
+    String? Function(String?)? validator,
+    Widget? suffix,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: cardColor,
+        color: isDark ? kNavyLighter : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
       ),
-      child: ClipRRect(borderRadius: BorderRadius.circular(16), child: child),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        validator: validator,
+        style: TextStyle(color: isDark ? Colors.white : kNavy, fontWeight: FontWeight.w600),
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, color: kAccent),
+          suffixIcon: suffix,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+          filled: true,
+          fillColor: Colors.transparent,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        ),
+      ),
     );
   }
-}
 
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  final Color color;
-  const _SectionLabel(this.text, this.color);
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 6),
-      child: Text(text, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w600)),
+  Widget _buildDropdown({
+    required String label,
+    required IconData icon,
+    required String? value,
+    required List<String> items,
+    required void Function(String?) onChanged,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? kNavyLighter : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: DropdownButtonFormField<String>(
+        value: value,
+        items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
+        onChanged: onChanged,
+        style: TextStyle(color: isDark ? Colors.white : kNavy, fontWeight: FontWeight.w600),
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, color: kAccent),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+          filled: true,
+          fillColor: Colors.transparent,
+        ),
+        dropdownColor: isDark ? kNavyLighter : Colors.white,
+      ),
     );
   }
 }

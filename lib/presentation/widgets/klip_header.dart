@@ -16,12 +16,21 @@ class KlipHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black87;
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
-      color: cardColor,
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -31,15 +40,22 @@ class KlipHeader extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.circle, color: kAccent, size: 10),
-                  const SizedBox(width: 8),
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: kAccent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   Text(
                     title,
                     style: TextStyle(
-                      fontSize: 22,
+                      fontSize: 24,
                       fontWeight: FontWeight.w900,
-                      color: textColor,
-                      letterSpacing: -0.5,
+                      color: colorScheme.onSurface,
+                      letterSpacing: -1,
                     ),
                   ),
                 ],
@@ -53,14 +69,20 @@ class KlipHeader extends StatelessWidget {
                       context,
                       MaterialPageRoute(builder: (_) => const SettingsScreen()),
                     ),
-                    child: const CircleAvatar(
-                      radius: 18,
-                      backgroundColor: kAccent,
-                      child: Text(
-                        'J',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: kAccent.withValues(alpha: 0.3), width: 2),
+                      ),
+                      child: const CircleAvatar(
+                        radius: 18,
+                        backgroundColor: kAccent,
+                        child: Text(
+                          'J',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
@@ -69,12 +91,12 @@ class KlipHeader extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: kAccent.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
               badge,
@@ -82,7 +104,7 @@ class KlipHeader extends StatelessWidget {
                 color: kAccent,
                 fontSize: 10,
                 fontWeight: FontWeight.w900,
-                letterSpacing: 0.8,
+                letterSpacing: 1.2,
               ),
             ),
           ),

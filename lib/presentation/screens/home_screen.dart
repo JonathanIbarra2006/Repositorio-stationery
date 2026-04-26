@@ -16,16 +16,14 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final transactionsAsync = ref.watch(transactionsProvider);
     final currency = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FA);
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final textColor = isDark ? Colors.white : Colors.black87;
-    final subColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
-
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    
     final dateRange = ref.watch(dateRangeProvider);
 
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: colorScheme.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -33,7 +31,7 @@ class HomeScreen extends ConsumerWidget {
             Expanded(
               child: transactionsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator(color: kAccent)),
-                error: (e, _) => Center(child: Text('Error: $e', style: TextStyle(color: textColor))),
+                error: (e, _) => Center(child: Text('Error: $e', style: TextStyle(color: colorScheme.onSurface))),
                 data: (state) {
                   final transactions = state.transactions;
                   final ingresos = state.totalIngresos;
@@ -45,11 +43,9 @@ class HomeScreen extends ConsumerWidget {
 
                   return ListView(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    physics: const BouncingScrollPhysics(),
                     children: [
                       _SummaryCard(
-                        cardColor: cardColor,
-                        textColor: textColor,
-                        subColor: subColor,
                         ingresos: ingresos,
                         gastos: gastos,
                         patrimonio: patrimonio,
@@ -63,12 +59,10 @@ class HomeScreen extends ConsumerWidget {
                             initialDateRange: dateRange.range,
                             builder: (context, child) {
                               return Theme(
-                                data: Theme.of(context).copyWith(
-                                  colorScheme: ColorScheme.light(
+                                data: theme.copyWith(
+                                  colorScheme: colorScheme.copyWith(
                                     primary: kAccent,
                                     onPrimary: Colors.white,
-                                    surface: cardColor,
-                                    onSurface: textColor,
                                   ),
                                 ),
                                 child: child!,
@@ -85,30 +79,86 @@ class HomeScreen extends ConsumerWidget {
                       Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: cardColor,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
+                          color: colorScheme.surface,
+                          borderRadius: BorderRadius.circular(32),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
+                            )
+                          ],
                         ),
-                        child: FlowChart(
-                          transactions: transactions,
-                          range: dateRange.range,
-                          isDark: isDark,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 4,
+                                  height: 20,
+                                  decoration: BoxDecoration(
+                                    color: kAccent,
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Flujo de Caja',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            FlowChart(
+                              transactions: transactions,
+                              range: dateRange.range,
+                              isDark: isDark,
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      Text('Actividad Reciente', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: textColor)),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 32),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Actividad Reciente', 
+                            style: TextStyle(
+                              fontSize: 18, 
+                              fontWeight: FontWeight.bold, 
+                              color: colorScheme.onSurface,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {}, 
+                            child: const Text('Ver todo', style: TextStyle(color: kAccent, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
                       if (ultimos.isEmpty)
                         Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Center(child: Text('No hay movimientos en este periodo', style: TextStyle(color: subColor))),
+                          padding: const EdgeInsets.all(40),
+                          child: Column(
+                            children: [
+                              Icon(Icons.inbox_outlined, size: 48, color: colorScheme.onSurface.withValues(alpha: 0.2)),
+                              const SizedBox(height: 12),
+                              Text(
+                                'No hay movimientos', 
+                                style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.5)),
+                              ),
+                            ],
+                          ),
                         ),
                       ...ultimos.map((t) => _ActivityTile(
                         transaction: t,
                         currency: currency,
-                        cardColor: cardColor,
-                        textColor: textColor,
-                        subColor: subColor,
                         isDark: isDark,
                       )),
                       const SizedBox(height: 80),
@@ -125,49 +175,123 @@ class HomeScreen extends ConsumerWidget {
 }
 
 class _SummaryCard extends StatelessWidget {
-  final Color cardColor, textColor, subColor;
   final double ingresos, gastos, patrimonio;
   final NumberFormat currency;
   final String dateLabel;
   final VoidCallback onCalendarTap;
 
-  const _SummaryCard({required this.cardColor, required this.textColor, required this.subColor, required this.ingresos, required this.gastos, required this.patrimonio, required this.currency, required this.dateLabel, required this.onCalendarTap});
+  const _SummaryCard({
+    required this.ingresos, 
+    required this.gastos, 
+    required this.patrimonio, 
+    required this.currency, 
+    required this.dateLabel, 
+    required this.onCalendarTap
+  });
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))]),
+      decoration: BoxDecoration(
+        color: colorScheme.surface, 
+        borderRadius: BorderRadius.circular(32), 
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05), 
+            blurRadius: 20, 
+            offset: const Offset(0, 10),
+          )
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Acumulado Total', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textColor)),
+              Text(
+                'Acumulado', 
+                style: TextStyle(
+                  fontSize: 24, 
+                  fontWeight: FontWeight.w900, 
+                  color: colorScheme.onSurface,
+                  letterSpacing: -1,
+                ),
+              ),
               GestureDetector(
                 onTap: onCalendarTap,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(color: kAccent.withOpacity(0.10), borderRadius: BorderRadius.circular(20), border: Border.all(color: kAccent.withOpacity(0.3))),
-                  child: Row(children: [const Icon(Icons.calendar_today, color: kAccent, size: 13), const SizedBox(width: 5), Text(dateLabel, style: const TextStyle(color: kAccent, fontWeight: FontWeight.bold, fontSize: 12))]),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: kAccent.withValues(alpha: 0.1), 
+                    borderRadius: BorderRadius.circular(16), 
+                    border: Border.all(color: kAccent.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today_rounded, color: kAccent, size: 14), 
+                      const SizedBox(width: 6), 
+                      Text(
+                        dateLabel, 
+                        style: const TextStyle(
+                          color: kAccent, 
+                          fontWeight: FontWeight.bold, 
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 24),
           Row(
             children: [
-              _StatItem(label: 'Ventas Totales', value: currency.format(ingresos), icon: Icons.trending_up, color: Colors.green),
-              const SizedBox(width: 32),
-              _StatItem(label: 'Gastos Totales', value: currency.format(gastos), icon: Icons.trending_down, color: kAccent),
+              Expanded(child: _StatItem(label: 'Ingresos', value: currency.format(ingresos), icon: Icons.arrow_upward_rounded, color: kSuccess)),
+              const SizedBox(width: 16),
+              Expanded(child: _StatItem(label: 'Gastos', value: currency.format(gastos), icon: Icons.arrow_downward_rounded, color: kError)),
             ],
           ),
-          const Divider(height: 32),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Divider(),
+          ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Patrimonio', style: TextStyle(color: subColor, fontSize: 13)), const SizedBox(height: 4), Text(currency.format(patrimonio), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: patrimonio >= 0 ? Colors.green : kAccent))]),
-              Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: kAccent.withOpacity(0.10), shape: BoxShape.circle), child: const Icon(Icons.trending_up, color: kAccent, size: 20)),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start, 
+                children: [
+                  Text('Balance General', style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 13, fontWeight: FontWeight.w600)), 
+                  const SizedBox(height: 4), 
+                  Text(
+                    currency.format(patrimonio), 
+                    style: TextStyle(
+                      fontSize: 26, 
+                      fontWeight: FontWeight.w900, 
+                      color: patrimonio >= 0 ? kSuccess : kError,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.all(12), 
+                decoration: BoxDecoration(
+                  color: (patrimonio >= 0 ? kSuccess : kError).withValues(alpha: 0.1), 
+                  shape: BoxShape.circle,
+                ), 
+                child: Icon(
+                  patrimonio >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded, 
+                  color: patrimonio >= 0 ? kSuccess : kError, 
+                  size: 24,
+                ),
+              ),
             ],
           ),
         ],
@@ -184,12 +308,23 @@ class _StatItem extends StatelessWidget {
   const _StatItem({required this.label, required this.value, required this.icon, required this.color});
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(6)), child: Icon(icon, color: color, size: 14)), const SizedBox(width: 6), Text(label, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w600))]),
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6), 
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), 
+              child: Icon(icon, color: color, size: 14),
+            ), 
+            const SizedBox(width: 8), 
+            Text(label, style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 12, fontWeight: FontWeight.w600)),
+          ],
+        ),
         const SizedBox(height: 8),
-        Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
       ],
     );
   }
@@ -198,15 +333,60 @@ class _StatItem extends StatelessWidget {
 class _ActivityTile extends StatelessWidget {
   final AppTransaction transaction;
   final NumberFormat currency;
-  final Color cardColor, textColor, subColor;
   final bool isDark;
-  const _ActivityTile({required this.transaction, required this.currency, required this.cardColor, required this.textColor, required this.subColor, required this.isDark});
+  const _ActivityTile({required this.transaction, required this.currency, required this.isDark});
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final t = transaction;
     final isIngreso = t.tipo == TransactionType.ingreso;
     final timeStr = DateFormat('HH:mm').format(t.fecha);
-    final color = isIngreso ? Colors.green : kAccent;
-    return Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))]), child: Row(children: [Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle), child: Icon(isIngreso ? Icons.arrow_upward : Icons.arrow_downward, color: color, size: 18)), const SizedBox(width: 14), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(t.descripcion, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textColor)), const SizedBox(height: 3), Text('$timeStr · ${t.categoria}', style: TextStyle(color: subColor, fontSize: 12))])), Text(currency.format(t.monto), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: color))]));
+    final color = isIngreso ? kSuccess : kError;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12), 
+      padding: const EdgeInsets.all(16), 
+      decoration: BoxDecoration(
+        color: colorScheme.surface, 
+        borderRadius: BorderRadius.circular(20), 
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03), 
+            blurRadius: 10, 
+            offset: const Offset(0, 4),
+          )
+        ],
+      ), 
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12), 
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle), 
+            child: Icon(isIngreso ? Icons.add_rounded : Icons.remove_rounded, color: color, size: 20),
+          ), 
+          const SizedBox(width: 16), 
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start, 
+              children: [
+                Text(
+                  t.descripcion, 
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: colorScheme.onSurface),
+                ), 
+                const SizedBox(height: 4), 
+                Text(
+                  '$timeStr · ${t.categoria}', 
+                  style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 12),
+                ),
+              ],
+            ),
+          ), 
+          Text(
+            currency.format(t.monto), 
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: color),
+          ),
+        ],
+      ),
+    );
   }
 }
