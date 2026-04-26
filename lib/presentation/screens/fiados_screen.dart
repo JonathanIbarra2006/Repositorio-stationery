@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../providers/fiado_provider.dart';
@@ -171,7 +170,7 @@ class _CarteraCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 4))
         ],
@@ -249,7 +248,7 @@ class _CarteraCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                    color: kAccent.withOpacity(0.10),
+                    color: kAccent.withValues(alpha: 0.10),
                     shape: BoxShape.circle),
                 child: const Icon(Icons.trending_up, color: kAccent, size: 20),
               ),
@@ -279,7 +278,7 @@ class _StatItem extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6)),
               child: Icon(icon, color: color, size: 14),
             ),
@@ -326,7 +325,7 @@ class _ClienteTile extends ConsumerWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 8,
               offset: const Offset(0, 2))
         ],
@@ -334,7 +333,7 @@ class _ClienteTile extends ConsumerWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
-          backgroundColor: kAccent.withOpacity(0.15),
+          backgroundColor: kAccent.withValues(alpha: 0.15),
           child: Text(inicial,
               style: const TextStyle(
                   color: kAccent,
@@ -354,7 +353,7 @@ class _ClienteTile extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: kAccent.withOpacity(0.1),
+                  color: kAccent.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Text(
@@ -388,7 +387,7 @@ class _ClienteTile extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: kAccent.withOpacity(0.08),
+                  color: kAccent.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
@@ -438,21 +437,21 @@ class _ClienteTile extends ConsumerWidget {
             if (cliente.isActive) ...[
               const PopupMenuItem(
                   value: 'ver',
-                  child: const Row(children: [
+                  child: Row(children: [
                     Icon(Icons.payment, size: 20),
                     SizedBox(width: 8),
                     Text('Cobrar / Ver')
                   ])),
               const PopupMenuItem(
                   value: 'editar',
-                  child: const Row(children: [
+                  child: Row(children: [
                     Icon(Icons.edit_outlined, size: 20),
                     SizedBox(width: 8),
                     Text('Editar')
                   ])),
               const PopupMenuItem(
                   value: 'desactivar',
-                  child: const Row(children: [
+                  child: Row(children: [
                     Icon(Icons.person_off_outlined, size: 20, color: kAccent),
                     SizedBox(width: 8),
                     Text('Desactivar', style: TextStyle(color: kAccent))
@@ -460,14 +459,14 @@ class _ClienteTile extends ConsumerWidget {
             ] else ...[
               const PopupMenuItem(
                   value: 'reactivar',
-                  child: const Row(children: [
+                  child: Row(children: [
                     Icon(Icons.check_circle_outline, size: 20, color: Colors.green),
                     SizedBox(width: 8),
                     Text('Reactivar')
                   ])),
               const PopupMenuItem(
                   value: 'eliminar',
-                  child: const Row(children: [
+                  child: Row(children: [
                     Icon(Icons.delete_forever, size: 20, color: Colors.red),
                     SizedBox(width: 8),
                     Text('Eliminar Definitivamente', style: TextStyle(color: Colors.red))

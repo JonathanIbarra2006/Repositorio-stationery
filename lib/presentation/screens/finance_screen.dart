@@ -13,6 +13,7 @@ import '../providers/fiado_provider.dart';
 import '../providers/date_range_provider.dart';
 import '../widgets/klip_header.dart';
 import 'venta_contado_screen.dart';
+import '../theme/app_colors.dart';
 
 class FinanceScreen extends ConsumerStatefulWidget {
   const FinanceScreen({super.key});
@@ -22,19 +23,20 @@ class FinanceScreen extends ConsumerStatefulWidget {
 }
 
 class _FinanceScreenState extends ConsumerState<FinanceScreen> {
-  static const _accent = Color(0xFFEF4063);
   final currency = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final transactionsAsync = ref.watch(transactionsProvider);
+    final dateRange = ref.watch(dateRangeProvider);
+    
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FA);
     final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
     final subColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
-
-    final transactionsAsync = ref.watch(transactionsProvider);
-    final dateRange = ref.watch(dateRangeProvider);
 
     return DefaultTabController(
       length: 4,
@@ -46,16 +48,17 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
             children: [
               const KlipHeader(title: 'Klip', badge: 'REPORTES DE NEGOCIO'),
               transactionsAsync.when(
-                loading: () => const LinearProgressIndicator(color: _accent),
+                loading: () => const LinearProgressIndicator(color: kAccent),
                 error: (e, _) => Center(child: Text('Error: $e')),
                 data: (state) => _FinancialSummaryCard(
                   state: state,
                   dateLabel: dateRange.label,
                   onDateTap: _selectDateRange,
+                  currency: currency,
                   cardColor: cardColor,
                   textColor: textColor,
                   subColor: subColor,
-                  currency: currency,
+                  isDark: isDark,
                 ),
               ),
               const SizedBox(height: 12),
@@ -64,9 +67,9 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                 child: TabBar(
                   isScrollable: true,
                   tabAlignment: TabAlignment.start,
-                  indicatorColor: _accent,
+                  indicatorColor: kAccent,
                   indicatorWeight: 3,
-                  labelColor: _accent,
+                  labelColor: kAccent,
                   unselectedLabelColor: subColor,
                   labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   dividerColor: Colors.transparent,
@@ -82,77 +85,87 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
               Expanded(
                 child: TabBarView(
                   children: [
-                    _ResumenTab(currency: currency, textColor: textColor, subColor: subColor, cardColor: cardColor),
-                    _MovimientosTab(currency: currency, textColor: textColor, subColor: subColor, cardColor: cardColor),
-                    _InventarioTab(currency: currency, textColor: textColor, subColor: subColor, cardColor: cardColor),
-                    _ClientesTab(currency: currency, textColor: textColor, subColor: subColor, cardColor: cardColor),
+                    _ResumenTab(currency: currency, cardColor: cardColor, textColor: textColor, subColor: subColor),
+                    _MovimientosTab(currency: currency, cardColor: cardColor, textColor: textColor, subColor: subColor),
+                    _InventarioTab(currency: currency, cardColor: cardColor, textColor: textColor, subColor: subColor),
+                    _ClientesTab(currency: currency, cardColor: cardColor, textColor: textColor, subColor: subColor),
                   ],
                 ),
               ),
             ],
           ),
         ),
-        floatingActionButton: _buildSpeedDial(context, isDark),
+        floatingActionButton: _buildSpeedDial(context),
       ),
     );
   }
 
-  Widget _buildSpeedDial(BuildContext context, bool isDark) {
+  Widget _buildSpeedDial(BuildContext context) {
     return SpeedDial(
-      icon: Icons.add,
-      activeIcon: Icons.close,
-      backgroundColor: _accent,
+      icon: Icons.add_rounded,
+      activeIcon: Icons.close_rounded,
+      backgroundColor: kAccent,
       foregroundColor: Colors.white,
       overlayColor: Colors.black,
-      overlayOpacity: 0.5,
-      spacing: 12,
+      overlayOpacity: 0.7,
+      spacing: 15,
       spaceBetweenChildren: 12,
+      childPadding: const EdgeInsets.all(4),
+      buttonSize: const Size(60, 60),
+      childrenButtonSize: const Size(56, 56),
+      elevation: 8,
+      animationCurve: Curves.elasticOut,
       children: [
         SpeedDialChild(
-          child: const Icon(Icons.point_of_sale),
-          backgroundColor: Colors.teal,
+          child: const Icon(Icons.point_of_sale_rounded, size: 28),
+          backgroundColor: kSuccess,
           foregroundColor: Colors.white,
-          label: 'Venta de Contado',
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+          label: 'Nueva Venta',
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          labelBackgroundColor: kSuccess,
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VentaDeContadoScreen())),
         ),
         SpeedDialChild(
-          child: const Icon(Icons.add_circle_outline),
-          backgroundColor: Colors.blue,
+          child: const Icon(Icons.add_circle_outline_rounded, size: 28),
+          backgroundColor: Colors.blueAccent,
           foregroundColor: Colors.white,
           label: 'Ingreso Extra',
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-          onTap: () => _showTransactionModal(context, ref, 'ingreso', isDark),
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          labelBackgroundColor: Colors.blueAccent,
+          onTap: () => _showTransactionModal(context, ref, 'ingreso'),
         ),
         SpeedDialChild(
-          child: const Icon(Icons.remove_circle_outline),
-          backgroundColor: Colors.redAccent,
+          child: const Icon(Icons.remove_circle_outline_rounded, size: 28),
+          backgroundColor: kError,
           foregroundColor: Colors.white,
           label: 'Egreso / Gasto',
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-          onTap: () => _showTransactionModal(context, ref, 'gasto', isDark),
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          labelBackgroundColor: kError,
+          onTap: () => _showTransactionModal(context, ref, 'gasto'),
         ),
       ],
     );
   }
 
-  void _showTransactionModal(BuildContext context, WidgetRef ref, String tipoString, bool isDark) {
+  void _showTransactionModal(BuildContext context, WidgetRef ref, String tipoString) {
     final formKey = GlobalKey<FormState>();
     double monto = 0;
     String descripcion = '';
     final TransactionType tipo = tipoString == 'ingreso' ? TransactionType.ingreso : TransactionType.gasto;
     String categoria = tipo == TransactionType.ingreso ? 'Ventas Extra' : 'Servicios';
-    final categorias = tipo == TransactionType.ingreso ? ['Ventas Extra', 'Aporte Capital', 'Préstamo', 'Otros'] : ['Servicios', 'Arriendo', 'Nómina', 'Proveedores', 'Mantenimiento', 'Otros'];
-
-    final modalBgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final textColor = isDark ? Colors.white : Colors.black87;
+    final categorias = tipo == TransactionType.ingreso 
+        ? ['Ventas Extra', 'Aporte Capital', 'Préstamo', 'Otros'] 
+        : ['Servicios', 'Arriendo', 'Nómina', 'Proveedores', 'Mantenimiento', 'Otros'];
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        decoration: BoxDecoration(color: modalBgColor, borderRadius: const BorderRadius.vertical(top: Radius.circular(25))),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        ),
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 24, right: 24, top: 20),
         child: SingleChildScrollView(
           child: Form(
@@ -160,18 +173,68 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(height: 5, width: 40, decoration: BoxDecoration(color: Colors.grey[400], borderRadius: BorderRadius.circular(10))),
-                const SizedBox(height: 20),
-                Text(tipo == TransactionType.ingreso ? 'Nuevo Ingreso' : 'Nuevo Gasto', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: tipo == TransactionType.ingreso ? Colors.green : Colors.red)),
+                Container(height: 4, width: 40, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10))),
                 const SizedBox(height: 24),
-                TextFormField(decoration: _inputDecoration('Monto', Icons.attach_money, textColor, isDark), keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null, onSaved: (v) => monto = double.parse(v!)),
-                const SizedBox(height: 16),
-                TextFormField(decoration: _inputDecoration('Descripción', Icons.description_outlined, textColor, isDark), textCapitalization: TextCapitalization.sentences, validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null, onSaved: (v) => descripcion = v!),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(value: categoria, dropdownColor: modalBgColor, decoration: _inputDecoration('Categoría', Icons.category_outlined, textColor, isDark), items: categorias.map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(color: textColor)))).toList(), onChanged: (v) => categoria = v!),
+                Text(
+                  tipo == TransactionType.ingreso ? 'Nuevo Ingreso' : 'Nuevo Gasto',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: tipo == TransactionType.ingreso ? kSuccess : kError,
+                  ),
+                ),
                 const SizedBox(height: 32),
-                SizedBox(width: double.infinity, height: 54, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: tipo == TransactionType.ingreso ? Colors.green : Colors.red, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), elevation: 0), onPressed: () { if (formKey.currentState!.validate()) { formKey.currentState!.save(); ref.read(transactionsProvider.notifier).addTransaction(AppTransaction(id: const Uuid().v4(), tipo: tipo, monto: monto, fecha: DateTime.now(), descripcion: descripcion, categoria: categoria)); Navigator.pop(ctx); } }, child: const Text('Guardar Movimiento', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)))),
-                const SizedBox(height: 30),
+                TextFormField(
+                  decoration: _inputDecoration('Monto', Icons.attach_money_rounded, tipo == TransactionType.ingreso ? kSuccess : kError),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
+                  onSaved: (v) => monto = double.parse(v!),
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  decoration: _inputDecoration('Descripción', Icons.description_outlined, kAccent),
+                  textCapitalization: TextCapitalization.sentences,
+                  validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
+                  onSaved: (v) => descripcion = v!,
+                ),
+                const SizedBox(height: 20),
+                DropdownButtonFormField<String>(
+                  initialValue: categoria,
+                  dropdownColor: Theme.of(context).colorScheme.surface,
+                  decoration: _inputDecoration('Categoría', Icons.category_outlined, kAccent),
+                  items: categorias.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                  onChanged: (v) => categoria = v!,
+                ),
+                const SizedBox(height: 40),
+                SizedBox(
+                  width: double.infinity,
+                  height: 60,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: tipo == TransactionType.ingreso ? kSuccess : kError,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                      elevation: 0,
+                    ),
+                    onPressed: () {
+                      if (formKey.currentState!.validate()) {
+                        formKey.currentState!.save();
+                        ref.read(transactionsProvider.notifier).addTransaction(AppTransaction(
+                          id: const Uuid().v4(),
+                          tipo: tipo,
+                          monto: monto,
+                          fecha: DateTime.now(),
+                          descripcion: descripcion,
+                          categoria: categoria,
+                        ));
+                        Navigator.pop(ctx);
+                      }
+                    },
+                    child: const Text('Guardar Movimiento', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(height: 40),
               ],
             ),
           ),
@@ -180,16 +243,35 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     );
   }
 
-  InputDecoration _inputDecoration(String label, IconData icon, Color textColor, bool isDark) {
-    return InputDecoration(labelText: label, prefixIcon: Icon(icon, color: _accent), filled: true, fillColor: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF9F9F9), border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none));
+  InputDecoration _inputDecoration(String label, IconData icon, Color accentColor) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, color: accentColor),
+      filled: true,
+      fillColor: Colors.grey.withValues(alpha: 0.05),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide(color: accentColor, width: 2)),
+    );
   }
 
   void _selectDateRange() async {
-    final range = await showDateRangePicker(context: context, firstDate: DateTime(2023), lastDate: DateTime(2030), builder: (context, child) => Theme(data: Theme.of(context).copyWith(colorScheme: const ColorScheme.light(primary: _accent, onPrimary: Colors.white, onSurface: Colors.black87)), child: child!));
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2023),
+      lastDate: DateTime(2030),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: kAccent,
+            onPrimary: Colors.white,
+          ),
+        ),
+        child: child!,
+      ),
+    );
     if (range != null) {
-      String label = 'Rango';
-      final now = DateTime.now();
-      if (range.start.day == now.day && range.start.month == now.month && range.start.year == now.year && range.end.day == now.day && range.end.month == now.month && range.end.year == now.year) { label = 'Hoy'; }
+      String label = '${DateFormat('d MMM').format(range.start)} - ${DateFormat('d MMM').format(range.end)}';
       ref.read(dateRangeProvider.notifier).setRange(range, label);
     }
   }
@@ -199,10 +281,20 @@ class _FinancialSummaryCard extends StatelessWidget {
   final TransactionState state;
   final String dateLabel;
   final VoidCallback onDateTap;
-  final Color cardColor, textColor, subColor;
   final NumberFormat currency;
+  final Color cardColor, textColor, subColor;
+  final bool isDark;
 
-  const _FinancialSummaryCard({required this.state, required this.dateLabel, required this.onDateTap, required this.cardColor, required this.textColor, required this.subColor, required this.currency});
+  const _FinancialSummaryCard({
+    required this.state, 
+    required this.dateLabel, 
+    required this.onDateTap, 
+    required this.currency,
+    required this.cardColor,
+    required this.textColor,
+    required this.subColor,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -211,12 +303,13 @@ class _FinancialSummaryCard extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4))
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          )
         ],
       ),
       child: Column(
@@ -236,61 +329,76 @@ class _FinancialSummaryCard extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
-                      color: const Color(0xFFEF4063).withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(20)),
+                      color: kAccent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: kAccent.withValues(alpha: 0.2))),
                   child: Row(
                     children: [
-                      const Icon(Icons.calendar_today_rounded, color: Color(0xFFEF4063), size: 14),
+                      const Icon(Icons.calendar_today_rounded, color: kAccent, size: 14),
                       const SizedBox(width: 8),
-                      Text(dateLabel, style: const TextStyle(color: Color(0xFFEF4063), fontWeight: FontWeight.bold, fontSize: 13))
+                      Text(dateLabel, style: const TextStyle(color: kAccent, fontWeight: FontWeight.bold, fontSize: 13))
                     ],
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
           Row(
             children: [
               _StatItem(
                 label: 'Ingresos',
                 value: currency.format(state.totalIngresos),
                 icon: Icons.arrow_downward,
-                color: Colors.green,
+                color: kSuccess,
               ),
-              const SizedBox(width: 40),
+              const Spacer(),
               _StatItem(
                 label: 'Egresos',
                 value: currency.format(state.totalGastos),
                 icon: Icons.arrow_upward,
-                color: const Color(0xFFEF4063),
+                color: kError,
               ),
             ],
           ),
-          const Divider(height: 32),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Balance Neto', style: TextStyle(color: subColor, fontSize: 13)),
-                  const SizedBox(height: 4),
-                  Text(
-                    currency.format(state.balance),
-                    style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        color: state.balance >= 0 ? Colors.green : const Color(0xFFEF4063)),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.black.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Balance Neto', style: TextStyle(color: subColor, fontSize: 13)),
+                    const SizedBox(height: 4),
+                    Text(
+                      currency.format(state.balance),
+                      style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: state.balance >= 0 ? kSuccess : kError),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: (state.balance >= 0 ? kSuccess : kError).withValues(alpha: 0.1), 
+                    shape: BoxShape.circle
                   ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: const Color(0xFFEF4063).withOpacity(0.05), shape: BoxShape.circle),
-                child: const Icon(Icons.trending_up, color: Color(0xFFEF4063), size: 20),
-              ),
-            ],
+                  child: Icon(
+                    state.balance >= 0 ? Icons.trending_up : Icons.trending_down, 
+                    color: state.balance >= 0 ? kSuccess : kError, 
+                    size: 24
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -314,16 +422,16 @@ class _StatItem extends StatelessWidget {
         Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(6)),
-              child: Icon(icon, color: color, size: 10),
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+              child: Icon(icon, color: color, size: 12),
             ),
             const SizedBox(width: 8),
             Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
           ],
         ),
-        const SizedBox(height: 8),
-        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 10),
+        Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
       ],
     );
   }
@@ -331,15 +439,16 @@ class _StatItem extends StatelessWidget {
 
 class _ResumenTab extends ConsumerWidget {
   final NumberFormat currency;
-  final Color textColor, subColor, cardColor;
-  const _ResumenTab({required this.currency, required this.textColor, required this.subColor, required this.cardColor});
+  final Color cardColor, textColor, subColor;
+  const _ResumenTab({required this.currency, required this.cardColor, required this.textColor, required this.subColor});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final transAsync = ref.watch(transactionsProvider);
     final clientesAsync = ref.watch(clientesProvider);
 
     return transAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const Center(child: CircularProgressIndicator(color: kAccent)),
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (state) {
         final Map<String, double> dist = {};
@@ -365,23 +474,74 @@ class _ResumenTab extends ConsumerWidget {
             const SizedBox(height: 10),
             Text('Distribución por Categoría', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
             const SizedBox(height: 20),
-            if (dist.isEmpty) _EmptyTab(label: 'Sin datos de ingresos', subColor: subColor) else Container(height: 200, padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(20)), child: PieChart(PieChartData(sectionsSpace: 4, centerSpaceRadius: 50, sections: dist.entries.map((e) { final colors = [const Color(0xFFEF4063), Colors.orange, Colors.teal, Colors.blue, Colors.purple]; final index = dist.keys.toList().indexOf(e.key) % colors.length; return PieChartSectionData(value: e.value, title: '${((e.value / (state.totalIngresos == 0 ? 1 : state.totalIngresos)) * 100).toStringAsFixed(0)}%', color: colors[index], radius: 30, titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)); }).toList()))),
+            if (dist.isEmpty) 
+              const _EmptyTab(label: 'Sin datos de ingresos') 
+            else 
+              Container(
+                height: 220, 
+                padding: const EdgeInsets.all(24), 
+                decoration: BoxDecoration(
+                  color: cardColor, 
+                  borderRadius: BorderRadius.circular(32),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10)],
+                ), 
+                child: PieChart(
+                  PieChartData(
+                    sectionsSpace: 4, 
+                    centerSpaceRadius: 50, 
+                    sections: dist.entries.map((e) { 
+                      final colors = [kAccent, Colors.orange, Colors.teal, Colors.purple, Colors.pink]; 
+                      final index = dist.keys.toList().indexOf(e.key) % colors.length; 
+                      return PieChartSectionData(
+                        value: e.value, 
+                        title: '${((e.value / (state.totalIngresos == 0 ? 1 : state.totalIngresos)) * 100).toStringAsFixed(0)}%', 
+                        color: colors[index], 
+                        radius: 30, 
+                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)
+                      ); 
+                    }).toList()
+                  )
+                )
+              ),
             const SizedBox(height: 24),
             Text('Leyenda', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: subColor)),
-            const SizedBox(height: 10),
-            ...dist.entries.map((e) { final colors = [const Color(0xFFEF4063), Colors.orange, Colors.teal, Colors.blue, Colors.purple]; final index = dist.keys.toList().indexOf(e.key) % colors.length; return Padding(padding: const EdgeInsets.only(bottom: 6), child: Row(children: [Container(width: 12, height: 12, decoration: BoxDecoration(color: colors[index], shape: BoxShape.circle)), const SizedBox(width: 8), Text(e.key, style: TextStyle(color: textColor, fontSize: 13)), const Spacer(), Text(currency.format(e.value), style: const TextStyle(fontWeight: FontWeight.bold))])); }),
+            const SizedBox(height: 12),
+            ...dist.entries.map((e) { 
+              final colors = [kAccent, Colors.orange, Colors.teal, Colors.purple, Colors.pink]; 
+              final index = dist.keys.toList().indexOf(e.key) % colors.length; 
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8), 
+                child: Row(
+                  children: [
+                    Container(width: 12, height: 12, decoration: BoxDecoration(color: colors[index], shape: BoxShape.circle)), 
+                    const SizedBox(width: 12), 
+                    Text(e.key, style: TextStyle(color: textColor, fontSize: 13)), 
+                    const Spacer(), 
+                    Text(currency.format(e.value), style: TextStyle(fontWeight: FontWeight.bold, color: textColor))
+                  ]
+                )
+              ); 
+            }),
             const SizedBox(height: 32),
             Text('Top Clientes (Ventas)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             clientesAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Text('Error al cargar clientes: $e'),
+              loading: () => const Center(child: CircularProgressIndicator(color: kAccent)),
+              error: (e, _) => Text('Error al cargar clientes: $e', style: const TextStyle(color: kError)),
               data: (clientes) {
-                if (sortedTop.isEmpty) return _EmptyTab(label: 'Sin ventas a clientes registrados', subColor: subColor);
+                if (sortedTop.isEmpty) return const _EmptyTab(label: 'Sin ventas a clientes registrados');
                 return Column(
                   children: sortedTop.take(5).map((entry) {
                     final cliente = clientes.firstWhere((c) => c.id == entry.key, orElse: () => throw 'Cliente no encontrado');
-                    return _TopClienteItem(name: cliente.nombre, id: cliente.id.substring(0, 8), amount: entry.value, currency: currency, cardColor: cardColor, textColor: textColor, subColor: subColor);
+                    return _TopClienteItem(
+                      name: cliente.nombre, 
+                      id: cliente.id.substring(0, 8), 
+                      amount: entry.value, 
+                      currency: currency,
+                      cardColor: cardColor,
+                      textColor: textColor,
+                      subColor: subColor,
+                    );
                   }).toList(),
                 );
               },
@@ -399,24 +559,52 @@ class _TopClienteItem extends StatelessWidget {
   final NumberFormat currency;
   final Color cardColor, textColor, subColor;
   const _TopClienteItem({required this.name, required this.id, required this.amount, required this.currency, required this.cardColor, required this.textColor, required this.subColor});
+
   @override
   Widget build(BuildContext context) {
-    return Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(20)), child: Row(children: [CircleAvatar(backgroundColor: const Color(0xFFEF4063).withOpacity(0.1), child: Text(name[0].toUpperCase(), style: const TextStyle(color: Color(0xFFEF4063), fontWeight: FontWeight.bold))), const SizedBox(width: 12), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(name, style: TextStyle(fontWeight: FontWeight.bold, color: textColor)), Text('ID: $id', style: TextStyle(color: subColor, fontSize: 12))]), const Spacer(), Text(currency.format(amount), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green))]));
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12), 
+      padding: const EdgeInsets.all(16), 
+      decoration: BoxDecoration(
+        color: cardColor, 
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 4)],
+      ), 
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: kAccent.withValues(alpha: 0.1), 
+            child: Text(name[0].toUpperCase(), style: const TextStyle(color: kAccent, fontWeight: FontWeight.bold))
+          ), 
+          const SizedBox(width: 16), 
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start, 
+            children: [
+              Text(name, style: TextStyle(fontWeight: FontWeight.bold, color: textColor)), 
+              Text('ID: $id', style: TextStyle(color: subColor, fontSize: 12))
+            ]
+          ), 
+          const Spacer(), 
+          Text(currency.format(amount), style: const TextStyle(fontWeight: FontWeight.bold, color: kSuccess))
+        ]
+      )
+    );
   }
 }
 
 class _MovimientosTab extends ConsumerWidget {
   final NumberFormat currency;
-  final Color textColor, subColor, cardColor;
-  const _MovimientosTab({required this.currency, required this.textColor, required this.subColor, required this.cardColor});
+  final Color cardColor, textColor, subColor;
+  const _MovimientosTab({required this.currency, required this.cardColor, required this.textColor, required this.subColor});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final transAsync = ref.watch(transactionsProvider);
     return transAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const Center(child: CircularProgressIndicator(color: kAccent)),
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (state) {
-        if (state.transactions.isEmpty) return _EmptyTab(label: 'Sin movimientos', subColor: subColor);
+        if (state.transactions.isEmpty) return const _EmptyTab(label: 'Sin movimientos');
         final list = [...state.transactions];
         list.sort((a, b) => b.fecha.compareTo(a.fecha));
         return ListView.builder(
@@ -425,7 +613,41 @@ class _MovimientosTab extends ConsumerWidget {
           itemBuilder: (context, index) {
             final t = list[index];
             final isIngreso = t.tipo == TransactionType.ingreso;
-            return Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(20)), child: Row(children: [Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: (isIngreso ? Colors.green : const Color(0xFFEF4063)).withOpacity(0.1), borderRadius: BorderRadius.circular(14)), child: Icon(isIngreso ? Icons.arrow_downward : Icons.arrow_upward, color: isIngreso ? Colors.green : const Color(0xFFEF4063), size: 20)), const SizedBox(width: 16), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(t.descripcion, style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 14)), Text(DateFormat('dd/MM/yyyy HH:mm').format(t.fecha), style: TextStyle(color: subColor, fontSize: 12))])), Text('${isIngreso ? '' : '- '}${currency.format(t.monto)}', style: TextStyle(fontWeight: FontWeight.w900, color: isIngreso ? Colors.green : const Color(0xFFEF4063)))]));
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12), 
+              padding: const EdgeInsets.all(16), 
+              decoration: BoxDecoration(
+                color: cardColor, 
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 4)],
+              ), 
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12), 
+                    decoration: BoxDecoration(
+                      color: (isIngreso ? kSuccess : kError).withValues(alpha: 0.1), 
+                      borderRadius: BorderRadius.circular(16)
+                    ), 
+                    child: Icon(isIngreso ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded, color: isIngreso ? kSuccess : kError, size: 20)
+                  ), 
+                  const SizedBox(width: 16), 
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start, 
+                      children: [
+                        Text(t.descripcion, style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 14)), 
+                        Text(DateFormat('dd/MM/yyyy HH:mm').format(t.fecha), style: TextStyle(color: subColor, fontSize: 12))
+                      ]
+                    )
+                  ), 
+                  Text(
+                    '${isIngreso ? '' : '- '}${currency.format(t.monto)}', 
+                    style: TextStyle(fontWeight: FontWeight.w900, color: isIngreso ? kSuccess : kError, fontSize: 16)
+                  )
+                ]
+              )
+            );
           },
         );
       },
@@ -435,22 +657,51 @@ class _MovimientosTab extends ConsumerWidget {
 
 class _InventarioTab extends ConsumerWidget {
   final NumberFormat currency;
-  final Color textColor, subColor, cardColor;
-  const _InventarioTab({required this.currency, required this.textColor, required this.subColor, required this.cardColor});
+  final Color cardColor, textColor, subColor;
+  const _InventarioTab({required this.currency, required this.cardColor, required this.textColor, required this.subColor});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final productsAsync = ref.watch(productsProvider);
     return productsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const Center(child: CircularProgressIndicator(color: kAccent)),
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (products) {
-        if (products.isEmpty) return _EmptyTab(label: 'Sin productos', subColor: subColor);
+        if (products.isEmpty) return const _EmptyTab(label: 'Sin productos');
         return ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 40),
           itemCount: products.length,
           itemBuilder: (context, index) {
             final p = products[index];
-            return Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(20)), child: Row(children: [Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFFEF4063).withOpacity(0.08), borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.inventory_2_outlined, color: Color(0xFFEF4063), size: 20)), const SizedBox(width: 16), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(p.nombre, style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 14)), Text('Stock: ${p.stock} | ${p.categoria}', style: TextStyle(color: subColor, fontSize: 12))])), Text(currency.format(p.precio), style: const TextStyle(fontWeight: FontWeight.w900))]));
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12), 
+              padding: const EdgeInsets.all(16), 
+              decoration: BoxDecoration(
+                color: cardColor, 
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 4)],
+              ), 
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12), 
+                    decoration: BoxDecoration(color: kAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(14)), 
+                    child: const Icon(Icons.inventory_2_outlined, color: kAccent, size: 20)
+                  ), 
+                  const SizedBox(width: 16), 
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start, 
+                      children: [
+                        Text(p.nombre, style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 14)), 
+                        Text('Stock: ${p.stock} | ${p.categoria}', style: TextStyle(color: subColor, fontSize: 12))
+                      ]
+                    )
+                  ), 
+                  Text(currency.format(p.precio), style: TextStyle(fontWeight: FontWeight.w900, color: textColor, fontSize: 16))
+                ]
+              )
+            );
           },
         );
       },
@@ -460,22 +711,56 @@ class _InventarioTab extends ConsumerWidget {
 
 class _ClientesTab extends ConsumerWidget {
   final NumberFormat currency;
-  final Color textColor, subColor, cardColor;
-  const _ClientesTab({required this.currency, required this.textColor, required this.subColor, required this.cardColor});
+  final Color cardColor, textColor, subColor;
+  const _ClientesTab({required this.currency, required this.cardColor, required this.textColor, required this.subColor});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final clientesAsync = ref.watch(clientesProvider);
     return clientesAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const Center(child: CircularProgressIndicator(color: kAccent)),
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (clientes) {
-        if (clientes.isEmpty) return _EmptyTab(label: 'Sin clientes', subColor: subColor);
+        if (clientes.isEmpty) return const _EmptyTab(label: 'Sin clientes');
         return ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 40),
           itemCount: clientes.length,
           itemBuilder: (context, index) {
             final c = clientes[index];
-            return Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(20)), child: Row(children: [CircleAvatar(backgroundColor: const Color(0xFFEF4063).withOpacity(0.1), child: Text(c.nombre[0].toUpperCase(), style: const TextStyle(color: Color(0xFFEF4063), fontWeight: FontWeight.bold))), const SizedBox(width: 16), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(c.nombre, style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 14)), Text(c.telefono ?? 'Sin teléfono', style: TextStyle(color: subColor, fontSize: 12))])), Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text(currency.format(c.deuda), style: TextStyle(fontWeight: FontWeight.w900, color: c.deuda > 0 ? Colors.orange : Colors.green)), if (c.deuda > 0) const Text('FIADO', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange))])]));
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12), 
+              padding: const EdgeInsets.all(16), 
+              decoration: BoxDecoration(
+                color: cardColor, 
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 4)],
+              ), 
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: kAccent.withValues(alpha: 0.1), 
+                    child: Text(c.nombre[0].toUpperCase(), style: const TextStyle(color: kAccent, fontWeight: FontWeight.bold))
+                  ), 
+                  const SizedBox(width: 16), 
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start, 
+                      children: [
+                        Text(c.nombre, style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 14)), 
+                        Text(c.telefono ?? 'Sin teléfono', style: TextStyle(color: subColor, fontSize: 12))
+                      ]
+                    )
+                  ), 
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end, 
+                    children: [
+                      Text(currency.format(c.deuda), style: TextStyle(fontWeight: FontWeight.w900, color: c.deuda > 0 ? Colors.orange : kSuccess, fontSize: 16)), 
+                      if (c.deuda > 0) const Text('FIADO', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange))
+                    ]
+                  )
+                ]
+              )
+            );
           },
         );
       },
@@ -485,10 +770,19 @@ class _ClientesTab extends ConsumerWidget {
 
 class _EmptyTab extends StatelessWidget {
   final String label;
-  final Color subColor;
-  const _EmptyTab({required this.label, required this.subColor});
+  const _EmptyTab({required this.label});
+
   @override
   Widget build(BuildContext context) {
-    return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.inbox_outlined, size: 48, color: subColor.withOpacity(0.5)), const SizedBox(height: 12), Text(label, style: TextStyle(color: subColor))]));
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.inbox_outlined, size: 48, color: Colors.grey.withValues(alpha: 0.3)),
+          const SizedBox(height: 12),
+          Text(label, style: TextStyle(color: Colors.grey.withValues(alpha: 0.5))),
+        ],
+      ),
+    );
   }
 }

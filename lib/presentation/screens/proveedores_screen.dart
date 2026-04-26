@@ -59,7 +59,7 @@ class _ProveedoresScreenState extends ConsumerState<ProveedoresScreen> {
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
+                              color: Colors.black.withValues(alpha: 0.04),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -142,7 +142,7 @@ class _ProveedoresScreenState extends ConsumerState<ProveedoresScreen> {
                                 ),
                                 Container(
                                   padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(color: const Color(0xFF28C76F).withOpacity(0.10), shape: BoxShape.circle),
+                                  decoration: BoxDecoration(color: const Color(0xFF28C76F).withValues(alpha: 0.10), shape: BoxShape.circle),
                                   child: const Icon(Icons.trending_up, color: Color(0xFF28C76F), size: 20),
                                 ),
                               ],
@@ -157,7 +157,7 @@ class _ProveedoresScreenState extends ConsumerState<ProveedoresScreen> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
-                          color: _showingInactive ? Colors.grey : textColor.withOpacity(0.9),
+                          color: _showingInactive ? Colors.grey : textColor.withValues(alpha: 0.9),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -213,7 +213,7 @@ class _ProveedoresScreenState extends ConsumerState<ProveedoresScreen> {
         padding: const EdgeInsets.symmetric(vertical: 40),
         child: Column(
           children: [
-            Icon(Icons.local_shipping_outlined, size: 64, color: color.withOpacity(0.5)),
+            Icon(Icons.local_shipping_outlined, size: 64, color: color.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
             Text('No hay proveedores registrados', style: TextStyle(color: color, fontWeight: FontWeight.w600)),
           ],
@@ -260,7 +260,7 @@ class _StatItem extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
               child: Icon(icon, color: color, size: 14),
             ),
             const SizedBox(width: 8),
@@ -298,7 +298,7 @@ class _SupplierCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
