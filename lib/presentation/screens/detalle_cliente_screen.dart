@@ -24,9 +24,9 @@ class _DetalleClienteScreenState extends ConsumerState<DetalleClienteScreen> {
     final historialFuture = ref.read(clientesProvider.notifier).obtenerHistorialCliente(widget.cliente.id);
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF121212) : kBg;
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final textColor = isDark ? Colors.white : Colors.black87;
+    final bgColor = Theme.of(context).scaffoldBackgroundColor;
+    final cardColor = Theme.of(context).colorScheme.surface;
+    final textColor = Theme.of(context).colorScheme.onSurface;
     final subColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
 
     final clienteActual = ref.watch(clientesProvider).maybeWhen(
@@ -77,12 +77,12 @@ class _DetalleClienteScreenState extends ConsumerState<DetalleClienteScreen> {
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
                           color: cardColor,
-                          borderRadius: BorderRadius.circular(24),
+                          borderRadius: BorderRadius.circular(32),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.04),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+                              color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
                             ),
                           ],
                         ),

@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:uuid/uuid.dart';
-import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 import '../../domain/models/transaction.dart';
@@ -12,8 +9,10 @@ import '../providers/product_provider.dart';
 import '../providers/fiado_provider.dart';
 import '../providers/date_range_provider.dart';
 import '../widgets/klip_header.dart';
-import 'venta_contado_screen.dart';
 import '../theme/app_colors.dart';
+import 'package:flutter_speed_dial/flutter_speed_dial.dart';
+import '../../core/utils/pdf_generator.dart';
+import '../../core/utils/excel_generator.dart';
 
 class FinanceScreen extends ConsumerStatefulWidget {
   const FinanceScreen({super.key});
@@ -33,9 +32,9 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     
-    final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FA);
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final textColor = isDark ? Colors.white : Colors.black87;
+    final bgColor = theme.scaffoldBackgroundColor;
+    final cardColor = theme.colorScheme.surface;
+    final textColor = theme.colorScheme.onSurface;
     final subColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
 
     return DefaultTabController(
@@ -95,14 +94,19 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
             ],
           ),
         ),
-        floatingActionButton: _buildSpeedDial(context),
+        floatingActionButton: _buildExportSpeedDial(context, ref),
       ),
     );
   }
 
-  Widget _buildSpeedDial(BuildContext context) {
+  Widget _buildExportSpeedDial(BuildContext context, WidgetRef ref) {
+    final List<AppTransaction> transactions = ref.watch(transactionsProvider).maybeWhen(
+      data: (state) => state.transactions,
+      orElse: () => <AppTransaction>[],
+    );
+
     return SpeedDial(
-      icon: Icons.add_rounded,
+      icon: Icons.ios_share_rounded,
       activeIcon: Icons.close_rounded,
       backgroundColor: kAccent,
       foregroundColor: Colors.white,
@@ -117,152 +121,41 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
       animationCurve: Curves.elasticOut,
       children: [
         SpeedDialChild(
-          child: const Icon(Icons.point_of_sale_rounded, size: 28),
-          backgroundColor: kSuccess,
+          child: const Icon(Icons.picture_as_pdf_rounded, size: 28),
+          backgroundColor: Colors.redAccent,
           foregroundColor: Colors.white,
-          label: 'Nueva Venta',
+          label: 'Exportar PDF',
           labelStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          labelBackgroundColor: kSuccess,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VentaDeContadoScreen())),
+          labelBackgroundColor: Colors.redAccent,
+          onTap: () => PdfGenerator.generateFinanceReport(transactions),
         ),
         SpeedDialChild(
-          child: const Icon(Icons.add_circle_outline_rounded, size: 28),
-          backgroundColor: Colors.blueAccent,
+          child: const Icon(Icons.table_chart_rounded, size: 28),
+          backgroundColor: Colors.green,
           foregroundColor: Colors.white,
-          label: 'Ingreso Extra',
+          label: 'Exportar Excel',
           labelStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          labelBackgroundColor: Colors.blueAccent,
-          onTap: () => _showTransactionModal(context, ref, 'ingreso'),
-        ),
-        SpeedDialChild(
-          child: const Icon(Icons.remove_circle_outline_rounded, size: 28),
-          backgroundColor: kError,
-          foregroundColor: Colors.white,
-          label: 'Egreso / Gasto',
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          labelBackgroundColor: kError,
-          onTap: () => _showTransactionModal(context, ref, 'gasto'),
+          labelBackgroundColor: Colors.green,
+          onTap: () => ExcelGenerator.generateFinanceReport(transactions),
         ),
       ],
     );
   }
 
-  void _showTransactionModal(BuildContext context, WidgetRef ref, String tipoString) {
-    final formKey = GlobalKey<FormState>();
-    double monto = 0;
-    String descripcion = '';
-    final TransactionType tipo = tipoString == 'ingreso' ? TransactionType.ingreso : TransactionType.gasto;
-    String categoria = tipo == TransactionType.ingreso ? 'Ventas Extra' : 'Servicios';
-    final categorias = tipo == TransactionType.ingreso 
-        ? ['Ventas Extra', 'Aporte Capital', 'Préstamo', 'Otros'] 
-        : ['Servicios', 'Arriendo', 'Nómina', 'Proveedores', 'Mantenimiento', 'Otros'];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-        ),
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 24, right: 24, top: 20),
-        child: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(height: 4, width: 40, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10))),
-                const SizedBox(height: 24),
-                Text(
-                  tipo == TransactionType.ingreso ? 'Nuevo Ingreso' : 'Nuevo Gasto',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: tipo == TransactionType.ingreso ? kSuccess : kError,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                TextFormField(
-                  decoration: _inputDecoration('Monto', Icons.attach_money_rounded, tipo == TransactionType.ingreso ? kSuccess : kError),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
-                  onSaved: (v) => monto = double.parse(v!),
-                ),
-                const SizedBox(height: 20),
-                TextFormField(
-                  decoration: _inputDecoration('Descripción', Icons.description_outlined, kAccent),
-                  textCapitalization: TextCapitalization.sentences,
-                  validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
-                  onSaved: (v) => descripcion = v!,
-                ),
-                const SizedBox(height: 20),
-                DropdownButtonFormField<String>(
-                  initialValue: categoria,
-                  dropdownColor: Theme.of(context).colorScheme.surface,
-                  decoration: _inputDecoration('Categoría', Icons.category_outlined, kAccent),
-                  items: categorias.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                  onChanged: (v) => categoria = v!,
-                ),
-                const SizedBox(height: 40),
-                SizedBox(
-                  width: double.infinity,
-                  height: 60,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: tipo == TransactionType.ingreso ? kSuccess : kError,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                      elevation: 0,
-                    ),
-                    onPressed: () {
-                      if (formKey.currentState!.validate()) {
-                        formKey.currentState!.save();
-                        ref.read(transactionsProvider.notifier).addTransaction(AppTransaction(
-                          id: const Uuid().v4(),
-                          tipo: tipo,
-                          monto: monto,
-                          fecha: DateTime.now(),
-                          descripcion: descripcion,
-                          categoria: categoria,
-                        ));
-                        Navigator.pop(ctx);
-                      }
-                    },
-                    child: const Text('Guardar Movimiento', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-                const SizedBox(height: 40),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  InputDecoration _inputDecoration(String label, IconData icon, Color accentColor) {
-    return InputDecoration(
-      labelText: label,
-      prefixIcon: Icon(icon, color: accentColor),
-      filled: true,
-      fillColor: Colors.grey.withValues(alpha: 0.05),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide(color: accentColor, width: 2)),
-    );
-  }
 
   void _selectDateRange() async {
-    final range = await showDateRangePicker(
+    final dateRange = ref.read(dateRangeProvider);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final picked = await showDateRangePicker(
       context: context,
-      firstDate: DateTime(2023),
+      firstDate: DateTime(2020),
       lastDate: DateTime(2030),
+      initialDateRange: dateRange.range,
       builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.dark(
+        data: theme.copyWith(
+          colorScheme: colorScheme.copyWith(
             primary: kAccent,
             onPrimary: Colors.white,
           ),
@@ -270,9 +163,9 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         child: child!,
       ),
     );
-    if (range != null) {
-      String label = '${DateFormat('d MMM').format(range.start)} - ${DateFormat('d MMM').format(range.end)}';
-      ref.read(dateRangeProvider.notifier).setRange(range, label);
+    if (picked != null) {
+      final label = '${DateFormat('d MMM').format(picked.start)} - ${DateFormat('d MMM').format(picked.end)}';
+      ref.read(dateRangeProvider.notifier).setRange(picked, label);
     }
   }
 }
@@ -306,7 +199,7 @@ class _FinancialSummaryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
             blurRadius: 20,
             offset: const Offset(0, 10),
           )
@@ -483,7 +376,13 @@ class _ResumenTab extends ConsumerWidget {
                 decoration: BoxDecoration(
                   color: cardColor, 
                   borderRadius: BorderRadius.circular(32),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10)],
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.4 : 0.08),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    )
+                  ],
                 ), 
                 child: PieChart(
                   PieChartData(

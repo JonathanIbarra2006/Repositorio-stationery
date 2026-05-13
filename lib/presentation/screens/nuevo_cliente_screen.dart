@@ -98,9 +98,9 @@ class _NuevoClienteScreenState extends ConsumerState<NuevoClienteScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
-    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF1E293B);
+    final bgColor = theme.scaffoldBackgroundColor;
+    final cardColor = theme.colorScheme.surface;
+    final textColor = theme.colorScheme.onSurface;
 
     return Scaffold(
       backgroundColor: bgColor,

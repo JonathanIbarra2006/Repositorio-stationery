@@ -25,9 +25,9 @@ class _FiadosScreenState extends ConsumerState<FiadosScreen> {
     final currency = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FA);
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final textColor = isDark ? Colors.white : Colors.black87;
+    final bgColor = Theme.of(context).scaffoldBackgroundColor;
+    final cardColor = Theme.of(context).colorScheme.surface;
+    final textColor = Theme.of(context).colorScheme.onSurface;
     final subColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
 
     return Scaffold(
@@ -126,13 +126,11 @@ class _FiadosScreenState extends ConsumerState<FiadosScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NuevoClienteScreen())),
         backgroundColor: kAccent,
-        foregroundColor: Colors.white,
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const NuevoClienteScreen()),
-        ),
-        child: const Icon(Icons.add, size: 28),
+        shape: const CircleBorder(),
+        elevation: 8,
+        child: const Icon(Icons.person_add_alt_1_rounded, color: Colors.white, size: 28),
       ),
     );
   }
@@ -167,12 +165,13 @@ class _CarteraCard extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4))
+            color: Colors.black.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.4 : 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          )
         ],
       ),
       child: Column(

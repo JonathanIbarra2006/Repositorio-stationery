@@ -1,6 +1,5 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -131,12 +130,13 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bgColor = theme.scaffoldBackgroundColor;
+    final textColor = theme.colorScheme.onSurface;
     final proveedoresAsync = ref.watch(proveedoresProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : kNavy;
 
     return Scaffold(
-      backgroundColor: isDark ? kNavy : kBg,
+      backgroundColor: bgColor,
       appBar: AppBar(
         title: Column(
           children: [
@@ -350,7 +350,7 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
           labelText: label,
           prefixIcon: Icon(icon, color: kAccent),
           suffixIcon: suffix,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+          border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(16)), borderSide: BorderSide.none),
           filled: true,
           fillColor: Colors.transparent,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -383,7 +383,7 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
         decoration: InputDecoration(
           labelText: label,
           prefixIcon: Icon(icon, color: kAccent),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+          border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(16)), borderSide: BorderSide.none),
           filled: true,
           fillColor: Colors.transparent,
         ),
