@@ -8,6 +8,9 @@ import '../theme/app_colors.dart';
 import '../providers/date_range_provider.dart';
 import '../widgets/flow_chart.dart';
 import '../widgets/klip_header.dart';
+import 'package:flutter_speed_dial/flutter_speed_dial.dart';
+import 'nueva_transaccion_screen.dart';
+import 'venta_contado_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -83,7 +86,7 @@ class HomeScreen extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(32),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+                              color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             )
@@ -170,6 +173,54 @@ class HomeScreen extends ConsumerWidget {
           ],
         ),
       ),
+      floatingActionButton: _buildSpeedDial(context),
+    );
+  }
+
+  Widget _buildSpeedDial(BuildContext context) {
+    return SpeedDial(
+      icon: Icons.add_rounded,
+      activeIcon: Icons.close_rounded,
+      backgroundColor: kAccent,
+      foregroundColor: Colors.white,
+      overlayColor: Colors.black,
+      overlayOpacity: 0.7,
+      spacing: 15,
+      spaceBetweenChildren: 12,
+      childPadding: const EdgeInsets.all(4),
+      buttonSize: const Size(60, 60),
+      childrenButtonSize: const Size(56, 56),
+      elevation: 8,
+      animationCurve: Curves.elasticOut,
+      children: [
+        SpeedDialChild(
+          child: const Icon(Icons.point_of_sale_rounded, size: 28),
+          backgroundColor: kSuccess,
+          foregroundColor: Colors.white,
+          label: 'Nueva Venta',
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          labelBackgroundColor: kSuccess,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VentaDeContadoScreen())),
+        ),
+        SpeedDialChild(
+          child: const Icon(Icons.add_circle_outline_rounded, size: 28),
+          backgroundColor: Colors.blueAccent,
+          foregroundColor: Colors.white,
+          label: 'Ingreso Extra',
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          labelBackgroundColor: Colors.blueAccent,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NuevaTransaccionScreen(tipo: TransactionType.ingreso))),
+        ),
+        SpeedDialChild(
+          child: const Icon(Icons.remove_circle_outline_rounded, size: 28),
+          backgroundColor: kError,
+          foregroundColor: Colors.white,
+          label: 'Egreso / Gasto',
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          labelBackgroundColor: kError,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NuevaTransaccionScreen(tipo: TransactionType.gasto))),
+        ),
+      ],
     );
   }
 }
@@ -201,7 +252,7 @@ class _SummaryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(32), 
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05), 
+            color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08), 
             blurRadius: 20, 
             offset: const Offset(0, 10),
           )

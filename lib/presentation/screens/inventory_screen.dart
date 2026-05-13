@@ -24,9 +24,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     
-    final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FA);
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final textColor = isDark ? Colors.white : Colors.black87;
+    final bgColor = theme.scaffoldBackgroundColor;
+    final cardColor = theme.colorScheme.surface;
+    final textColor = theme.colorScheme.onSurface;
     final subColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
 
     return Scaffold(
@@ -52,10 +52,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
                           color: cardColor,
-                          borderRadius: BorderRadius.circular(24),
+                          borderRadius: BorderRadius.circular(32),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+                              color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),
@@ -212,8 +212,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NuevoProductoScreen())),
         backgroundColor: kAccent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        elevation: 4,
+        shape: const CircleBorder(),
+        elevation: 8,
         child: const Icon(Icons.add, color: Colors.white, size: 28),
       ),
     );
