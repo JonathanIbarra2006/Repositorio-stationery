@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../domain/models/product.dart';
 import '../../domain/models/transaction.dart';
 import '../providers/product_provider.dart';
 import '../providers/transaction_provider.dart';
+import '../providers/fiado_provider.dart';
 import '../theme/app_colors.dart';
 import '../../core/utils/pdf_generator.dart';
 
@@ -27,6 +27,10 @@ class _VentaDeContadoScreenState
       TextEditingController(text: '1');
 
   bool _procesando = false;
+
+  // ── Estado de venta fiada ──────────────────────────────────
+  bool _esFiado = false;
+  Cliente? _clienteFiado;
 
   double get _totalVenta {
     double total = 0;
@@ -68,6 +72,7 @@ class _VentaDeContadoScreenState
   @override
   Widget build(BuildContext context) {
     final productsAsync = ref.watch(productsProvider);
+    final clientesAsync = ref.watch(clientesProvider);
     final currency =
         NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 
@@ -83,7 +88,7 @@ class _VentaDeContadoScreenState
       body: SafeArea(
         child: Column(
           children: [
-            // Header
+            // ── Header ───────────────────────────────────────────
             Padding(
               padding:
                   const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -128,7 +133,7 @@ class _VentaDeContadoScreenState
             Expanded(
               child: Column(
                 children: [
-                  // Product Selection Area
+                  // ── Selector de productos ─────────────────────
                   Container(
                     margin: const EdgeInsets.all(16),
                     padding: const EdgeInsets.all(20),
@@ -293,7 +298,7 @@ class _VentaDeContadoScreenState
                     ),
                   ),
 
-                  // Cart List
+                  // ── Lista del carrito ─────────────────────────
                   Expanded(
                     child: _carrito.isEmpty
                         ? Center(
@@ -386,9 +391,9 @@ class _VentaDeContadoScreenState
               ),
             ),
 
-            // Checkout Section
+            // ── Checkout Section ──────────────────────────────────
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
               decoration: BoxDecoration(
                 color: cardColor,
                 borderRadius:
@@ -407,6 +412,7 @@ class _VentaDeContadoScreenState
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Total
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -418,14 +424,189 @@ class _VentaDeContadoScreenState
                                 letterSpacing: 1)),
                         Text(
                           currency.format(_totalVenta),
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.w900,
-                              color: kSuccess),
+                              color: _esFiado ? kWarning : kSuccess),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+
+                    const SizedBox(height: 16),
+
+                    // ── Toggle FIADO ────────────────────────────────
+                    GestureDetector(
+                      onTap: _procesando
+                          ? null
+                          : () => setState(() {
+                                _esFiado = !_esFiado;
+                                if (!_esFiado) _clienteFiado = null;
+                              }),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: _esFiado
+                              ? kWarning.withValues(alpha: 0.12)
+                              : (isDark
+                                  ? Colors.white.withValues(alpha: 0.05)
+                                  : Colors.grey.withValues(alpha: 0.07)),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: _esFiado
+                                ? kWarning.withValues(alpha: 0.5)
+                                : Colors.transparent,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: _esFiado
+                                    ? kWarning.withValues(alpha: 0.2)
+                                    : Colors.grey.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.handshake_outlined,
+                                color: _esFiado ? kWarning : subColor,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Venta Fiada (a Crédito)',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: _esFiado ? kWarning : textColor,
+                                    ),
+                                  ),
+                                  Text(
+                                    _esFiado
+                                        ? 'Se registrará como deuda del cliente'
+                                        : 'Toca para cambiar a venta fiada',
+                                    style: TextStyle(
+                                        fontSize: 11, color: subColor),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch.adaptive(
+                              value: _esFiado,
+                              onChanged: _procesando
+                                  ? null
+                                  : (val) => setState(() {
+                                        _esFiado = val;
+                                        if (!val) _clienteFiado = null;
+                                      }),
+                              activeTrackColor: kWarning,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // ── Selector de cliente (solo si es fiado) ──────
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                      child: _esFiado
+                          ? Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: clientesAsync.when(
+                                loading: () => const LinearProgressIndicator(
+                                    color: kWarning),
+                                error: (e, _) => Text('Error: $e',
+                                    style: const TextStyle(color: kError)),
+                                data: (clientes) {
+                                  final activos = clientes
+                                      .where((c) => c.isActive)
+                                      .toList();
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'CLIENTE DEL FIADO',
+                                        style: TextStyle(
+                                            color: kWarning,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 1.2),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      if (activos.isEmpty)
+                                        Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: kError.withValues(
+                                                alpha: 0.08),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(Icons.warning_rounded,
+                                                  color: kError, size: 18),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                'No hay clientes registrados.\nRegistra un cliente primero.',
+                                                style: TextStyle(
+                                                    color: kError,
+                                                    fontSize: 12),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      else
+                                        DropdownButtonFormField<Cliente>(
+                                          decoration: _inputDecoration(
+                                              'Seleccionar cliente...',
+                                              Icons.person_search_rounded,
+                                              kWarning,
+                                              isDark),
+                                          dropdownColor: cardColor,
+                                          isExpanded: true,
+                                          value: _clienteFiado,
+                                          icon: const Icon(
+                                              Icons.keyboard_arrow_down_rounded,
+                                              color: kWarning),
+                                          style: TextStyle(
+                                              color: textColor, fontSize: 15),
+                                          onChanged: _procesando
+                                              ? null
+                                              : (val) => setState(
+                                                  () => _clienteFiado = val),
+                                          items: activos
+                                              .map((c) => DropdownMenuItem(
+                                                    value: c,
+                                                    child: Text(
+                                                      c.nombre,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ))
+                                              .toList(),
+                                        ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // ── Botón de confirmación ───────────────────────
                     SizedBox(
                       width: double.infinity,
                       height: 56,
@@ -435,7 +616,7 @@ class _VentaDeContadoScreenState
                               ? (isDark
                                   ? Colors.white10
                                   : Colors.grey.shade200)
-                              : kSuccess,
+                              : (_esFiado ? kWarning : kSuccess),
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -443,18 +624,25 @@ class _VentaDeContadoScreenState
                         ),
                         onPressed: (_carrito.isEmpty || _procesando)
                             ? null
-                            : _procesarVenta,
+                            : (_esFiado ? _procesarFiado : _procesarVenta),
                         child: _procesando
                             ? const CircularProgressIndicator(
                                 color: Colors.white)
-                            : const Row(
+                            : Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.check_circle_rounded, size: 24),
-                                  SizedBox(width: 12),
+                                  Icon(
+                                    _esFiado
+                                        ? Icons.handshake_rounded
+                                        : Icons.check_circle_rounded,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 12),
                                   Text(
-                                    'CONFIRMAR PAGO',
-                                    style: TextStyle(
+                                    _esFiado
+                                        ? 'REGISTRAR FIADO'
+                                        : 'CONFIRMAR PAGO',
+                                    style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w900),
                                   ),
@@ -528,6 +716,7 @@ class _VentaDeContadoScreenState
     });
   }
 
+  // ─── Procesar Venta de Contado (flujo original) ──────────────
   Future<void> _procesarVenta() async {
     setState(() {
       _procesando = true;
@@ -551,7 +740,7 @@ class _VentaDeContadoScreenState
       }
 
       final nuevaTransaccion = AppTransaction(
-        id: const Uuid().v4(),
+        id: _uuid(),
         tipo: TransactionType.ingreso,
         monto: _totalVenta,
         fecha: fecha,
@@ -621,6 +810,112 @@ class _VentaDeContadoScreenState
         _mostrarError('Error procesando venta: $e');
       }
     }
+  }
+
+  // ─── Procesar Venta Fiada ─────────────────────────────────────
+  Future<void> _procesarFiado() async {
+    // Validar que se haya seleccionado un cliente
+    if (_clienteFiado == null) {
+      _mostrarError('Debes seleccionar un cliente para registrar el fiado');
+      return;
+    }
+
+    setState(() {
+      _procesando = true;
+      _productoSeleccionado = null;
+    });
+
+    try {
+      final descripcion =
+          _carrito.entries.map((e) => '${e.value}x ${e.key.nombre}').join(', ');
+
+      final carritoItems = _carrito.entries
+          .map((e) => {
+                'productoId': e.key.id,
+                'nombre': e.key.nombre,
+                'cantidad': e.value,
+                'precio': e.key.precio,
+              })
+          .toList();
+
+      final error = await ref.read(fiadosProvider.notifier).crearFiado(
+            clienteId: _clienteFiado!.id,
+            nombreCliente: _clienteFiado!.nombre,
+            total: _totalVenta,
+            productosDescripcion: descripcion,
+            carritoItems: carritoItems,
+          );
+
+      // Refrescar inventario
+      ref.invalidate(productsProvider);
+
+      if (mounted) {
+        setState(() => _procesando = false);
+        if (error != null) {
+          _mostrarError(error);
+          return;
+        }
+
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24)),
+            title: Row(children: [
+              const Icon(Icons.handshake_rounded,
+                  color: kWarning, size: 30),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text('Fiado Registrado',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ]),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Cliente: ${_clienteFiado!.nombre}',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text(descripcion,
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kWarning,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  setState(() {
+                    _carrito.clear();
+                    _esFiado = false;
+                    _clienteFiado = null;
+                  });
+                },
+                child: const Text('Entendido'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _procesando = false);
+        _mostrarError('Error registrando fiado: $e');
+      }
+    }
+  }
+
+  String _uuid() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return 'txn-$now';
   }
 
   void _mostrarError(String mensaje) {

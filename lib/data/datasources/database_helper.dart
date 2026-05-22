@@ -19,7 +19,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 7,
+      version: 8,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -77,7 +77,7 @@ class DatabaseHelper {
       )
     ''');
 
-    // 5. Fiados (CON CAMPO NUEVO: MONTO_PAGADO)
+    // 5. Fiados
     await db.execute('''
       CREATE TABLE fiados (
         id TEXT PRIMARY KEY,
@@ -90,9 +90,21 @@ class DatabaseHelper {
         FOREIGN KEY (cliente_id) REFERENCES clientes (id)
       )
     ''');
+
+    // 6. Abonos de Fiados
+    await db.execute('''
+      CREATE TABLE abonos_fiados (
+        id TEXT PRIMARY KEY,
+        fiado_id TEXT NOT NULL,
+        monto REAL NOT NULL,
+        fecha TEXT NOT NULL,
+        nota TEXT,
+        FOREIGN KEY (fiado_id) REFERENCES fiados (id)
+      )
+    ''');
   }
 
-  /// Migración de versión 1 → 2 y 2 → 3
+  /// Migraciones de versión
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute(
@@ -126,6 +138,19 @@ class DatabaseHelper {
       await db.execute(
         'ALTER TABLE clientes ADD COLUMN email TEXT',
       );
+    }
+    if (oldVersion < 8) {
+      // Nueva tabla para abonos a fiados
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS abonos_fiados (
+          id TEXT PRIMARY KEY,
+          fiado_id TEXT NOT NULL,
+          monto REAL NOT NULL,
+          fecha TEXT NOT NULL,
+          nota TEXT,
+          FOREIGN KEY (fiado_id) REFERENCES fiados (id)
+        )
+      ''');
     }
   }
 

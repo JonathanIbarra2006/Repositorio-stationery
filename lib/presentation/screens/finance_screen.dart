@@ -431,18 +431,23 @@ class _ResumenTab extends ConsumerWidget {
                 if (sortedTop.isEmpty) return const _EmptyTab(label: 'Sin ventas a clientes registrados');
                 return Column(
                   children: sortedTop.take(5).map((entry) {
-                    final cliente = clientes.firstWhere((c) => c.id == entry.key, orElse: () => throw 'Cliente no encontrado');
-                    return _TopClienteItem(
-                      name: cliente.nombre, 
-                      id: cliente.id.substring(0, 8), 
-                      amount: entry.value, 
-                      currency: currency,
-                      cardColor: cardColor,
-                      textColor: textColor,
-                      subColor: subColor,
-                    );
+                    try {
+                      final cliente = clientes.firstWhere((c) => c.id == entry.key);
+                      return _TopClienteItem(
+                        name: cliente.nombre, 
+                        id: cliente.id.substring(0, 8), 
+                        amount: entry.value, 
+                        currency: currency,
+                        cardColor: cardColor,
+                        textColor: textColor,
+                        subColor: subColor,
+                      );
+                    } catch (_) {
+                      return const SizedBox.shrink();
+                    }
                   }).toList(),
                 );
+
               },
             ),
           ],
@@ -620,39 +625,103 @@ class _ClientesTab extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator(color: kAccent)),
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (clientes) {
-        if (clientes.isEmpty) return const _EmptyTab(label: 'Sin clientes');
+        final activos = clientes.where((c) => c.isActive).toList();
+        if (activos.isEmpty) return const _EmptyTab(label: 'Sin clientes');
         return ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 40),
-          itemCount: clientes.length,
+          itemCount: activos.length,
           itemBuilder: (context, index) {
-            final c = clientes[index];
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12), 
-              padding: const EdgeInsets.all(16), 
-              decoration: BoxDecoration(
-                color: cardColor, 
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 4)],
-              ), 
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: kAccent.withValues(alpha: 0.1), 
-                    child: Text(c.nombre[0].toUpperCase(), style: const TextStyle(color: kAccent, fontWeight: FontWeight.bold))
-                  ), 
-                  const SizedBox(width: 16), 
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start, 
-                      children: [
-                        Text(c.nombre, style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 14)), 
-                        Text(c.telefono ?? 'Sin teléfono', style: TextStyle(color: subColor, fontSize: 12))
-                      ]
-                    )
-                  ), 
-                  Icon(Icons.person_outline, color: kAccent.withValues(alpha: 0.5), size: 20)
-                ]
-              )
+            final c = activos[index];
+            return FutureBuilder<double>(
+              future: ref.read(fiadosProvider.notifier).getDeudaTotalCliente(c.id),
+              builder: (ctx, snap) {
+                final deuda = snap.data ?? 0.0;
+                final tieneDeuda = deuda > 0;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(24),
+                    border: tieneDeuda
+                        ? Border.all(
+                            color: kWarning.withValues(alpha: 0.25), width: 1)
+                        : null,
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          blurRadius: 4)
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: (tieneDeuda ? kWarning : kAccent)
+                            .withValues(alpha: 0.1),
+                        child: Text(
+                          c.nombre[0].toUpperCase(),
+                          style: TextStyle(
+                              color: tieneDeuda ? kWarning : kAccent,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(c.nombre,
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: textColor,
+                                    fontSize: 14)),
+                            Text(c.telefono ?? 'Sin teléfono',
+                                style:
+                                    TextStyle(color: subColor, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      if (snap.connectionState == ConnectionState.waiting)
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: kAccent),
+                        )
+                      else if (tieneDeuda)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text('Deuda',
+                                style:
+                                    TextStyle(color: kWarning, fontSize: 10)),
+                            Text(
+                              currency.format(deuda),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  color: kWarning,
+                                  fontSize: 14),
+                            ),
+                          ],
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: kSuccess.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text('Al día',
+                              style: TextStyle(
+                                  color: kSuccess,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12)),
+                        ),
+                    ],
+                  ),
+                );
+              },
             );
           },
         );
@@ -660,6 +729,7 @@ class _ClientesTab extends ConsumerWidget {
     );
   }
 }
+
 
 class _EmptyTab extends StatelessWidget {
   final String label;

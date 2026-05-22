@@ -195,6 +195,7 @@ class _ProveedoresScreenState extends ConsumerState<ProveedoresScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: null,
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const NuevoProveedorScreen()),

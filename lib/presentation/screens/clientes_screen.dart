@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/fiado_provider.dart';
 import '../theme/app_colors.dart';
 import 'nuevo_cliente_screen.dart';
+import 'cuenta_cliente_screen.dart';
 import '../widgets/klip_header.dart';
 
 class ClientesScreen extends ConsumerStatefulWidget {
@@ -112,6 +113,11 @@ class _ClientesScreenState extends ConsumerState<ClientesScreen> {
                                       MaterialPageRoute(
                                           builder: (_) => NuevoClienteScreen(
                                               clienteAEditar: c))),
+                                  onVerCuenta: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (_) =>
+                                              CuentaClienteScreen(cliente: c))),
                                 ))
                             .toList(),
                       );
@@ -126,6 +132,7 @@ class _ClientesScreenState extends ConsumerState<ClientesScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: null,
         onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(
@@ -274,7 +281,7 @@ class _StatItem extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-// TILE DE CLIENTE (sin badge de deuda)
+// TILE DE CLIENTE — con badge de deuda y botón "Ver Cuenta"
 // ─────────────────────────────────────────────────────────────
 class _ClienteTile extends ConsumerWidget {
   final Cliente cliente;
@@ -282,6 +289,7 @@ class _ClienteTile extends ConsumerWidget {
   final Color textColor;
   final Color subColor;
   final VoidCallback onEdit;
+  final VoidCallback onVerCuenta;
 
   const _ClienteTile({
     required this.cliente,
@@ -289,6 +297,7 @@ class _ClienteTile extends ConsumerWidget {
     required this.textColor,
     required this.subColor,
     required this.onEdit,
+    required this.onVerCuenta,
   });
 
   @override
@@ -308,120 +317,159 @@ class _ClienteTile extends ConsumerWidget {
               offset: const Offset(0, 2))
         ],
       ),
-      child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        leading: CircleAvatar(
-          backgroundColor: kAccent.withValues(alpha: 0.15),
-          child: Text(inicial,
-              style: const TextStyle(
-                  color: kAccent,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16)),
-        ),
-        title: Text(
-          cliente.nombre,
-          style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: textColor,
-              fontSize: 15),
-        ),
-        subtitle: Row(
-          children: [
-            Icon(Icons.phone, size: 13, color: subColor),
-            const SizedBox(width: 4),
-            Text(
-              cliente.telefono != null && cliente.telefono!.isNotEmpty
-                  ? cliente.telefono!
-                  : 'Sin teléfono',
-              style: TextStyle(color: subColor, fontSize: 13),
+      child: Column(
+        children: [
+          ListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            leading: CircleAvatar(
+              backgroundColor: kAccent.withValues(alpha: 0.15),
+              child: Text(inicial,
+                  style: const TextStyle(
+                      color: kAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16)),
             ),
-          ],
-        ),
-        trailing: PopupMenuButton<String>(
-          icon: Icon(Icons.more_vert, color: subColor),
-          onSelected: (v) async {
-            if (v == 'editar') onEdit();
-            if (v == 'desactivar') {
-              final error = await ref
-                  .read(clientesProvider.notifier)
-                  .desactivarCliente(cliente.id);
-              if (error != null && context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(error),
-                    backgroundColor: Colors.orange));
-              }
-            }
-            if (v == 'reactivar') {
-              await ref
-                  .read(clientesProvider.notifier)
-                  .reactivarCliente(cliente.id);
-            }
-            if (v == 'eliminar') {
-              if (!context.mounted) return;
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (c2) => AlertDialog(
-                  title: const Text('Eliminar Cliente'),
-                  content: const Text(
-                      '¿Estás seguro de eliminar este cliente permanentemente? Esta acción no se puede deshacer.'),
-                  actions: [
-                    TextButton(
-                        onPressed: () => Navigator.pop(c2, false),
-                        child: const Text('Cancelar')),
-                    TextButton(
-                        onPressed: () => Navigator.pop(c2, true),
-                        child: const Text('Eliminar',
-                            style: TextStyle(color: Colors.red))),
-                  ],
+            title: Text(
+              cliente.nombre,
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                  fontSize: 15),
+            ),
+            subtitle: Row(
+              children: [
+                Icon(Icons.phone, size: 13, color: subColor),
+                const SizedBox(width: 4),
+                Text(
+                  cliente.telefono != null && cliente.telefono!.isNotEmpty
+                      ? cliente.telefono!
+                      : 'Sin teléfono',
+                  style: TextStyle(color: subColor, fontSize: 13),
                 ),
-              );
-              if (confirm == true) {
-                await ref
-                    .read(clientesProvider.notifier)
-                    .eliminarClientePermanentemente(cliente.id);
-              }
-            }
-          },
-          itemBuilder: (_) => [
-            if (cliente.isActive) ...[
-              const PopupMenuItem(
-                  value: 'editar',
-                  child: Row(children: [
-                    Icon(Icons.edit_outlined, size: 20),
-                    SizedBox(width: 8),
-                    Text('Editar')
-                  ])),
-              const PopupMenuItem(
-                  value: 'desactivar',
-                  child: Row(children: [
-                    Icon(Icons.person_off_outlined,
-                        size: 20, color: kAccent),
-                    SizedBox(width: 8),
-                    Text('Desactivar',
-                        style: TextStyle(color: kAccent))
-                  ])),
-            ] else ...[
-              const PopupMenuItem(
-                  value: 'reactivar',
-                  child: Row(children: [
-                    Icon(Icons.check_circle_outline,
-                        size: 20, color: Colors.green),
-                    SizedBox(width: 8),
-                    Text('Reactivar')
-                  ])),
-              const PopupMenuItem(
-                  value: 'eliminar',
-                  child: Row(children: [
-                    Icon(Icons.delete_forever,
-                        size: 20, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Eliminar Definitivamente',
-                        style: TextStyle(color: Colors.red))
-                  ])),
-            ],
-          ],
-        ),
+              ],
+            ),
+            trailing: PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert, color: subColor),
+              onSelected: (v) async {
+                if (v == 'editar') onEdit();
+                if (v == 'ver_cuenta') onVerCuenta();
+                if (v == 'desactivar') {
+                  final error = await ref
+                      .read(clientesProvider.notifier)
+                      .desactivarCliente(cliente.id);
+                  if (error != null && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(error),
+                        backgroundColor: Colors.orange));
+                  }
+                }
+                if (v == 'reactivar') {
+                  await ref
+                      .read(clientesProvider.notifier)
+                      .reactivarCliente(cliente.id);
+                }
+                if (v == 'eliminar') {
+                  if (!context.mounted) return;
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (c2) => AlertDialog(
+                      title: const Text('Eliminar Cliente'),
+                      content: const Text(
+                          '¿Estás seguro de eliminar este cliente permanentemente? Esta acción no se puede deshacer.'),
+                      actions: [
+                        TextButton(
+                            onPressed: () => Navigator.pop(c2, false),
+                            child: const Text('Cancelar')),
+                        TextButton(
+                            onPressed: () => Navigator.pop(c2, true),
+                            child: const Text('Eliminar',
+                                style: TextStyle(color: Colors.red))),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    await ref
+                        .read(clientesProvider.notifier)
+                        .eliminarClientePermanentemente(cliente.id);
+                  }
+                }
+              },
+              itemBuilder: (_) => [
+                if (cliente.isActive) ...[
+                  const PopupMenuItem(
+                      value: 'ver_cuenta',
+                      child: Row(children: [
+                        Icon(Icons.account_balance_wallet_outlined,
+                            size: 20, color: kWarning),
+                        SizedBox(width: 8),
+                        Text('Ver Cuenta / Cobrar',
+                            style: TextStyle(color: kWarning))
+                      ])),
+                  const PopupMenuItem(
+                      value: 'editar',
+                      child: Row(children: [
+                        Icon(Icons.edit_outlined, size: 20),
+                        SizedBox(width: 8),
+                        Text('Editar')
+                      ])),
+                  const PopupMenuItem(
+                      value: 'desactivar',
+                      child: Row(children: [
+                        Icon(Icons.person_off_outlined,
+                            size: 20, color: kAccent),
+                        SizedBox(width: 8),
+                        Text('Desactivar',
+                            style: TextStyle(color: kAccent))
+                      ])),
+                ] else ...[
+                  const PopupMenuItem(
+                      value: 'reactivar',
+                      child: Row(children: [
+                        Icon(Icons.check_circle_outline,
+                            size: 20, color: Colors.green),
+                        SizedBox(width: 8),
+                        Text('Reactivar')
+                      ])),
+                  const PopupMenuItem(
+                      value: 'eliminar',
+                      child: Row(children: [
+                        Icon(Icons.delete_forever,
+                            size: 20, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Eliminar Definitivamente',
+                            style: TextStyle(color: Colors.red))
+                      ])),
+                ],
+              ],
+            ),
+          ),
+
+          // ── Botón "Ver Cuenta / Cobrar" siempre visible ────────
+          if (cliente.isActive)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kWarning,
+                    side: BorderSide(
+                        color: kWarning.withValues(alpha: 0.4), width: 1.5),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  icon: const Icon(Icons.account_balance_wallet_outlined,
+                      size: 17),
+                  label: const Text('Ver Cuenta / Cobrar',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  onPressed: onVerCuenta,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -210,6 +210,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: null,
         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NuevoProductoScreen())),
         backgroundColor: kAccent,
         shape: const CircleBorder(),
