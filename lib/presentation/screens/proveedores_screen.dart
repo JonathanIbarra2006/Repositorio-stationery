@@ -336,9 +336,13 @@ class _SupplierCard extends ConsumerWidget {
                     children: [
                       const Icon(Icons.calendar_today, size: 12, color: Colors.blueAccent),
                       const SizedBox(width: 6),
-                      Text(
-                        'Visita: ${proveedor.diasVisita}',
-                        style: const TextStyle(color: Colors.blueAccent, fontSize: 12, fontWeight: FontWeight.w600),
+                      Flexible(
+                        child: Text(
+                          'Visita: ${proveedor.diasVisita}',
+                          style: const TextStyle(color: Colors.blueAccent, fontSize: 12, fontWeight: FontWeight.w600),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
                       ),
                     ],
                   ),

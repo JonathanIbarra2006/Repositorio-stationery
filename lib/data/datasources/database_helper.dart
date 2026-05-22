@@ -19,7 +19,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 8,
+      version: 9,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -71,6 +71,7 @@ class DatabaseHelper {
       CREATE TABLE clientes (
         id TEXT PRIMARY KEY,
         nombre TEXT NOT NULL,
+        cedula TEXT,
         telefono TEXT,
         email TEXT,
         is_active INTEGER DEFAULT 1
@@ -151,6 +152,11 @@ class DatabaseHelper {
           FOREIGN KEY (fiado_id) REFERENCES fiados (id)
         )
       ''');
+    }
+    if (oldVersion < 9) {
+      await db.execute(
+        'ALTER TABLE clientes ADD COLUMN cedula TEXT',
+      );
     }
   }
 

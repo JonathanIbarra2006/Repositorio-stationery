@@ -6,11 +6,13 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../domain/models/transaction.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/product_provider.dart';
-import '../providers/fiado_provider.dart'; // Solo para clientesProvider (gestión de clientes)
+import '../providers/fiado_provider.dart';
 import '../providers/date_range_provider.dart';
+import '../providers/proveedor_provider.dart';
 import '../widgets/klip_header.dart';
 import '../theme/app_colors.dart';
-import 'package:flutter_speed_dial/flutter_speed_dial.dart';
+import '../../domain/models/product.dart';
+import '../../domain/models/proveedor.dart';
 import '../../core/utils/pdf_generator.dart';
 import '../../core/utils/excel_generator.dart';
 
@@ -94,51 +96,23 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
             ],
           ),
         ),
-        floatingActionButton: _buildExportSpeedDial(context, ref),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () => _showExportOptions(context, ref),
+          backgroundColor: kAccent,
+          icon: const Icon(Icons.ios_share_rounded, color: Colors.white),
+          label: const Text('Exportar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        ),
       ),
     );
   }
 
-  Widget _buildExportSpeedDial(BuildContext context, WidgetRef ref) {
-    final List<AppTransaction> transactions = ref.watch(transactionsProvider).maybeWhen(
-      data: (state) => state.transactions,
-      orElse: () => <AppTransaction>[],
-    );
-
-    return SpeedDial(
-      icon: Icons.ios_share_rounded,
-      activeIcon: Icons.close_rounded,
-      backgroundColor: kAccent,
-      foregroundColor: Colors.white,
-      overlayColor: Colors.black,
-      overlayOpacity: 0.7,
-      spacing: 15,
-      spaceBetweenChildren: 12,
-      childPadding: const EdgeInsets.all(4),
-      buttonSize: const Size(60, 60),
-      childrenButtonSize: const Size(56, 56),
-      elevation: 8,
-      animationCurve: Curves.elasticOut,
-      children: [
-        SpeedDialChild(
-          child: const Icon(Icons.picture_as_pdf_rounded, size: 28),
-          backgroundColor: Colors.redAccent,
-          foregroundColor: Colors.white,
-          label: 'Exportar PDF',
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          labelBackgroundColor: Colors.redAccent,
-          onTap: () => PdfGenerator.generateFinanceReport(transactions),
-        ),
-        SpeedDialChild(
-          child: const Icon(Icons.table_chart_rounded, size: 28),
-          backgroundColor: Colors.green,
-          foregroundColor: Colors.white,
-          label: 'Exportar Excel',
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          labelBackgroundColor: Colors.green,
-          onTap: () => ExcelGenerator.generateFinanceReport(transactions),
-        ),
-      ],
+  void _showExportOptions(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      isScrollControlled: true,
+      builder: (ctx) => _ExportBottomSheet(parentRef: ref),
     );
   }
 
@@ -744,6 +718,197 @@ class _EmptyTab extends StatelessWidget {
           Icon(Icons.inbox_outlined, size: 48, color: Colors.grey.withValues(alpha: 0.3)),
           const SizedBox(height: 12),
           Text(label, style: TextStyle(color: Colors.grey.withValues(alpha: 0.5))),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _ExportBottomSheet extends StatefulWidget {
+  final WidgetRef parentRef;
+  const _ExportBottomSheet({required this.parentRef});
+
+  @override
+  State<_ExportBottomSheet> createState() => _ExportBottomSheetState();
+}
+
+class _ExportBottomSheetState extends State<_ExportBottomSheet> {
+  String _selectedCategory = 'General';
+  bool _isExporting = false;
+
+  final List<Map<String, dynamic>> _categories = [
+    {'id': 'General', 'icon': Icons.dashboard_rounded, 'title': 'Todo en General', 'desc': 'Resumen total de negocio'},
+    {'id': 'Movimientos', 'icon': Icons.sync_alt_rounded, 'title': 'Movimientos', 'desc': 'Ingresos y egresos'},
+    {'id': 'Inventario', 'icon': Icons.inventory_2_rounded, 'title': 'Inventario', 'desc': 'Stock y valorización'},
+    {'id': 'Clientes', 'icon': Icons.people_rounded, 'title': 'Clientes', 'desc': 'Directorio de clientes'},
+    {'id': 'Fiados', 'icon': Icons.handshake_rounded, 'title': 'Clientes Fiados', 'desc': 'Cartera pendiente por cobrar'},
+    {'id': 'Proveedores', 'icon': Icons.business_rounded, 'title': 'Proveedores', 'desc': 'Directorio de proveedores'},
+  ];
+
+  Future<void> _exportar(bool isPdf) async {
+    setState(() => _isExporting = true);
+    try {
+      final ref = widget.parentRef;
+      
+      // Obtener datos
+      final transacciones = ref.read(transactionsProvider).maybeWhen(data: (d) => d.transactions, orElse: () => <AppTransaction>[]);
+      final productos = ref.read(productsProvider).maybeWhen(data: (d) => d, orElse: () => <Product>[]);
+      final clientes = ref.read(clientesProvider).maybeWhen(data: (d) => d, orElse: () => <Cliente>[]);
+      final proveedores = ref.read(proveedoresProvider).maybeWhen(data: (d) => d, orElse: () => <Proveedor>[]);
+      
+      Map<String, double> deudas = {};
+      if (_selectedCategory == 'Fiados' || _selectedCategory == 'General') {
+        final fNotif = ref.read(fiadosProvider.notifier);
+        for (var c in clientes) {
+          deudas[c.id] = await fNotif.getDeudaTotalCliente(c.id);
+        }
+      }
+
+      switch (_selectedCategory) {
+        case 'General':
+          if (isPdf) {
+            await PdfGenerator.generateGeneralReport(transacciones: transacciones, products: productos, clientes: clientes, deudas: deudas, proveedores: proveedores);
+          } else {
+            await ExcelGenerator.generateGeneralReport(transacciones: transacciones, products: productos, clientes: clientes, deudas: deudas, proveedores: proveedores);
+          }
+          break;
+        case 'Movimientos':
+          if (isPdf) {
+            await PdfGenerator.generateMovementsReport(transacciones);
+          } else {
+            await ExcelGenerator.generateMovementsReport(transacciones);
+          }
+          break;
+        case 'Inventario':
+          if (isPdf) {
+            await PdfGenerator.generateInventoryReport(productos);
+          } else {
+            await ExcelGenerator.generateInventoryReport(productos);
+          }
+          break;
+        case 'Clientes':
+          if (isPdf) {
+            await PdfGenerator.generateClientsReport(clientes);
+          } else {
+            await ExcelGenerator.generateClientsReport(clientes);
+          }
+          break;
+        case 'Fiados':
+          if (isPdf) {
+            await PdfGenerator.generateDebtorsReport(clientes, deudas);
+          } else {
+            await ExcelGenerator.generateDebtorsReport(clientes, deudas);
+          }
+          break;
+        case 'Proveedores':
+          if (isPdf) {
+            await PdfGenerator.generateProvidersReport(proveedores);
+          } else {
+            await ExcelGenerator.generateProvidersReport(proveedores);
+          }
+          break;
+      }
+      
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error exportando: $e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Exportar Reporte', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text('1. Selecciona la Categoría', style: TextStyle(fontWeight: FontWeight.bold, color: kAccent)),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 220,
+            child: GridView.builder(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2, childAspectRatio: 2.5, crossAxisSpacing: 10, mainAxisSpacing: 10
+              ),
+              itemCount: _categories.length,
+              itemBuilder: (ctx, i) {
+                final c = _categories[i];
+                final isSelected = _selectedCategory == c['id'];
+                return InkWell(
+                  onTap: () => setState(() => _selectedCategory = c['id'] as String),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: isSelected ? kAccent.withValues(alpha: 0.1) : (isDark ? Colors.black26 : Colors.grey.shade100),
+                      border: Border.all(color: isSelected ? kAccent : Colors.transparent, width: 2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(c['icon'] as IconData, color: isSelected ? kAccent : Colors.grey, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(c['title'] as String, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isSelected ? kAccent : null))),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text('2. Selecciona el Formato', style: TextStyle(fontWeight: FontWeight.bold, color: kAccent)),
+          const SizedBox(height: 12),
+          if (_isExporting)
+            const Center(child: CircularProgressIndicator(color: kAccent))
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent, foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))
+                    ),
+                    onPressed: () => _exportar(true),
+                    icon: const Icon(Icons.picture_as_pdf_rounded),
+                    label: const Text('PDF', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green, foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))
+                    ),
+                    onPressed: () => _exportar(false),
+                    icon: const Icon(Icons.table_chart_rounded),
+                    label: const Text('Excel', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          const SizedBox(height: 24),
         ],
       ),
     );

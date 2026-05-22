@@ -18,6 +18,7 @@ class _NuevoClienteScreenState extends ConsumerState<NuevoClienteScreen> {
   final _formKey = GlobalKey<FormState>();
 
   late final TextEditingController _nombreCtrl;
+  late final TextEditingController _cedulaCtrl;
   late final TextEditingController _telefonoCtrl;
   late final TextEditingController _emailCtrl;
 
@@ -30,6 +31,7 @@ class _NuevoClienteScreenState extends ConsumerState<NuevoClienteScreen> {
     super.initState();
     final c = widget.clienteAEditar;
     _nombreCtrl = TextEditingController(text: c?.nombre ?? '');
+    _cedulaCtrl = TextEditingController(text: c?.cedula ?? '');
     _telefonoCtrl = TextEditingController(text: c?.telefono ?? '');
     _emailCtrl = TextEditingController(text: c?.email ?? '');
   }
@@ -37,6 +39,7 @@ class _NuevoClienteScreenState extends ConsumerState<NuevoClienteScreen> {
   @override
   void dispose() {
     _nombreCtrl.dispose();
+    _cedulaCtrl.dispose();
     _telefonoCtrl.dispose();
     _emailCtrl.dispose();
     super.dispose();
@@ -46,6 +49,7 @@ class _NuevoClienteScreenState extends ConsumerState<NuevoClienteScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final nombre = _nombreCtrl.text.trim();
+    final cedula = _cedulaCtrl.text.trim();
     final telefono = _telefonoCtrl.text.trim();
     final email = _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim();
 
@@ -54,12 +58,14 @@ class _NuevoClienteScreenState extends ConsumerState<NuevoClienteScreen> {
         await ref.read(clientesProvider.notifier).editarCliente(
               widget.clienteAEditar!.id,
               nombre,
+              cedula,
               telefono,
               email,
             );
       } else {
         await ref.read(clientesProvider.notifier).registrarNuevoClienteDirecto(
           nombre,
+          cedula,
           telefono,
           email,
         );
@@ -158,6 +164,23 @@ class _NuevoClienteScreenState extends ConsumerState<NuevoClienteScreen> {
                         decoration: _inputDecoration('Nombre completo *', Icons.person_outline_rounded, kAccent, isDark),
                         textCapitalization: TextCapitalization.words,
                         validator: (v) => v == null || v.trim().isEmpty ? 'El nombre es requerido' : null,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _InputCard(
+                      cardColor: cardColor,
+                      isDark: isDark,
+                      child: TextFormField(
+                        controller: _cedulaCtrl,
+                        style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
+                        decoration: _inputDecoration('Cédula *', Icons.badge_rounded, kAccent, isDark),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'La cédula es requerida';
+                          if (v.trim().length < 8) return 'Debe tener mínimo 8 números';
+                          return null;
+                        },
                       ),
                     ),
                     const SizedBox(height: 16),

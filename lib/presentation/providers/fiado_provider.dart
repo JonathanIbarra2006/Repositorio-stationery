@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/datasources/database_helper.dart';
 import '../../domain/models/transaction.dart';
+import 'dart:math';
 import 'package:uuid/uuid.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -14,6 +15,7 @@ enum EstadoFiado { pendiente, pagadoParcial, saldado }
 class Cliente {
   final String id;
   final String nombre;
+  final String cedula;
   final String? telefono;
   final String? email;
   final bool isActive;
@@ -21,6 +23,7 @@ class Cliente {
   Cliente({
     required this.id,
     required this.nombre,
+    required this.cedula,
     this.telefono,
     this.email,
     this.isActive = true,
@@ -135,6 +138,7 @@ class ClientesNotifier extends StateNotifier<AsyncValue<List<Cliente>>> {
           .map((row) => Cliente(
                 id: row['id'] as String,
                 nombre: row['nombre'] as String,
+                cedula: row['cedula'] as String? ?? '',
                 telefono: row['telefono'] as String?,
                 email: row['email'] as String?,
                 isActive: row['is_active'] == null || row['is_active'] == 1,
@@ -168,11 +172,22 @@ class ClientesNotifier extends StateNotifier<AsyncValue<List<Cliente>>> {
   }
 
   Future<void> registrarNuevoClienteDirecto(
-      String nombre, String telefono, String? email) async {
+      String nombre, String cedula, String telefono, String? email) async {
     final db = await DatabaseHelper.instance.database;
+    
+    // Validar cédula única
+    final existing = await db.query('clientes', where: 'cedula = ?', whereArgs: [cedula]);
+    if (existing.isNotEmpty) {
+      throw Exception('Ya existe un cliente registrado con esta cédula.');
+    }
+
+    final randomStr = Random().nextInt(99999999).toString().padLeft(8, '0');
+    final customId = 'CLI-$randomStr';
+    
     await db.insert('clientes', {
-      'id': const Uuid().v4(),
+      'id': customId,
       'nombre': nombre,
+      'cedula': cedula,
       'telefono': telefono,
       'email': email,
       'is_active': 1
@@ -181,13 +196,21 @@ class ClientesNotifier extends StateNotifier<AsyncValue<List<Cliente>>> {
   }
 
   Future<void> editarCliente(
-      String id, String nuevoNombre, String nuevoTelefono,
+      String id, String nuevoNombre, String nuevoCedula, String nuevoTelefono,
       String? nuevoEmail) async {
     final db = await DatabaseHelper.instance.database;
+    
+    // Validar cédula única
+    final existing = await db.query('clientes', where: 'cedula = ? AND id != ?', whereArgs: [nuevoCedula, id]);
+    if (existing.isNotEmpty) {
+      throw Exception('Ya existe otro cliente registrado con esta cédula.');
+    }
+
     await db.update(
         'clientes',
         {
           'nombre': nuevoNombre,
+          'cedula': nuevoCedula,
           'telefono': nuevoTelefono,
           'email': nuevoEmail
         },

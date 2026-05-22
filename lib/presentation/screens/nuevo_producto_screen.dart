@@ -190,7 +190,7 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
                   IconButton.filledTonal(
                     onPressed: () => setState(() => _codigoCtrl.text = _generarEAN13()),
                     icon: const Icon(Icons.auto_awesome_rounded),
-                    style: IconButton.styleFrom(backgroundColor: kAccent.withOpacity(0.1), foregroundColor: kAccent),
+                    style: IconButton.styleFrom(backgroundColor: kAccent.withValues(alpha: 0.1), foregroundColor: kAccent),
                   ),
                 ],
               ),
@@ -338,7 +338,7 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
         color: isDark ? kNavyLighter : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
       child: TextFormField(
@@ -372,11 +372,11 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
         color: isDark ? kNavyLighter : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
       child: DropdownButtonFormField<String>(
-        value: value,
+        initialValue: value,
         items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
         onChanged: onChanged,
         style: TextStyle(color: isDark ? Colors.white : kNavy, fontWeight: FontWeight.w600),
