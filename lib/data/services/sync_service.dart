@@ -25,7 +25,6 @@ class SyncService {
     await _uploadTable('proveedores', db, userId);
     await _uploadTable('clientes', db, userId);
     await _uploadTable('transacciones', db, userId);
-    await _uploadTable('fiados', db, userId);
   }
 
   Future<void> _uploadTable(String tableName, dynamic db, String userId) async {
@@ -55,7 +54,6 @@ class SyncService {
     await _downloadTable('proveedores', db, userId);
     await _downloadTable('clientes', db, userId);
     await _downloadTable('transacciones', db, userId);
-    await _downloadTable('fiados', db, userId);
   }
 
   Future<void> _downloadTable(String tableName, dynamic db, String userId) async {

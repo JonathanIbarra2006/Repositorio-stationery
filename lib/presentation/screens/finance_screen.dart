@@ -6,7 +6,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../domain/models/transaction.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/product_provider.dart';
-import '../providers/fiado_provider.dart';
+import '../providers/fiado_provider.dart'; // Solo para clientesProvider (gestión de clientes)
 import '../providers/date_range_provider.dart';
 import '../widgets/klip_header.dart';
 import '../theme/app_colors.dart';
@@ -650,13 +650,7 @@ class _ClientesTab extends ConsumerWidget {
                       ]
                     )
                   ), 
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end, 
-                    children: [
-                      Text(currency.format(c.deuda), style: TextStyle(fontWeight: FontWeight.w900, color: c.deuda > 0 ? Colors.orange : kSuccess, fontSize: 16)), 
-                      if (c.deuda > 0) const Text('FIADO', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange))
-                    ]
-                  )
+                  Icon(Icons.person_outline, color: kAccent.withValues(alpha: 0.5), size: 20)
                 ]
               )
             );

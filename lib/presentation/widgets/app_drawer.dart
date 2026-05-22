@@ -57,7 +57,7 @@ class AppDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.people, color: brandOrange),
-            title: const Text('Clientes / Fiados'),
+            title: const Text('Clientes'),
             onTap: () {
               // Navegar a Clientes
             },

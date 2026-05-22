@@ -4,7 +4,7 @@ import 'home_screen.dart';
 import 'finance_screen.dart';
 import 'inventory_screen.dart';
 import 'proveedores_screen.dart';
-import 'fiados_screen.dart';
+import 'clientes_screen.dart';
 import '../../core/theme/app_theme.dart';
 
 class MainLayout extends ConsumerStatefulWidget {
@@ -19,7 +19,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
 
   final List<Widget> _screens = const [
     HomeScreen(),        // 0 — Inicio
-    FiadosScreen(),      // 1 — Clientes
+    ClientesScreen(),    // 1 — Clientes
     ProveedoresScreen(), // 2 — Proveedor
     InventoryScreen(),   // 3 — Inventario
     FinanceScreen(),     // 4 — Reportes
