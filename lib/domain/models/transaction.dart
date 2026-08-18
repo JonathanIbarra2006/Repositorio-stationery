@@ -35,7 +35,7 @@ class AppTransaction {
     return AppTransaction(
       id: map['id'],
       tipo: map['tipo'] == 'ingreso' ? TransactionType.ingreso : TransactionType.gasto,
-      monto: map['monto'],
+      monto: (map['monto'] as num).toDouble(),
       fecha: DateTime.parse(map['fecha']),
       categoria: map['categoria'],
       descripcion: map['descripcion'],

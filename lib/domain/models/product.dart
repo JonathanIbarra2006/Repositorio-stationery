@@ -64,7 +64,7 @@ class Product {
       id: map['id'],
       nombre: map['nombre'],
       categoria: map['categoria'],
-      precio: map['precio'],
+      precio: (map['precio'] as num).toDouble(),
       stock: map['stock'],
       codigoBarras: map['codigo_barras'],
       proveedor: map['proveedor'] ?? 'Sin Proveedor',

@@ -156,7 +156,7 @@ class ExcelGenerator {
     for (var p in proveedores) {
       sheet.appendRow([
         TextCellValue(p.empresa),
-        TextCellValue(p.contacto),
+        TextCellValue(p.nombre),
         TextCellValue(p.contacto),
         TextCellValue(p.diasVisita ?? ''),
         TextCellValue(''),

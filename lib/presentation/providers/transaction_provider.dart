@@ -16,14 +16,16 @@ class TransactionState {
 
 class TransactionNotifier extends StateNotifier<AsyncValue<TransactionState>> {
   final TransactionRepository _repository;
+  final DateTime? _startDate;
+  final DateTime? _endDate;
 
-  TransactionNotifier(this._repository) : super(const AsyncValue.loading());
+  TransactionNotifier(this._repository, this._startDate, this._endDate) : super(const AsyncValue.loading());
 
-  Future<void> loadTransactions({DateTime? startDate, DateTime? endDate}) async {
+  Future<void> loadTransactions() async {
     state = const AsyncValue.loading();
     try {
       // 1. Pedimos a la BD las transacciones filtradas
-      final transacciones = await _repository.getTransactions(startDate: startDate, endDate: endDate);
+      final transacciones = await _repository.getTransactions(startDate: _startDate, endDate: _endDate);
 
       // 2. Recalculamos el balance SOLO de esas fechas
       double ingresos = 0;
@@ -70,14 +72,11 @@ final transactionsProvider = StateNotifierProvider<TransactionNotifier, AsyncVal
   final repo = ref.watch(transactionRepoProvider);
   final dateRange = ref.watch(dateRangeProvider);
   
-  final notifier = TransactionNotifier(repo);
+  final notifier = TransactionNotifier(repo, dateRange.range?.start, dateRange.range?.end);
   
   // Cargamos con el rango inicial
   // Usamos microtask para evitar errores de actualización durante el build
-  Future.microtask(() => notifier.loadTransactions(
-    startDate: dateRange.range?.start,
-    endDate: dateRange.range?.end,
-  ));
+  Future.microtask(() => notifier.loadTransactions());
   
   return notifier;
 });

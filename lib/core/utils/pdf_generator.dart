@@ -340,7 +340,7 @@ class PdfGenerator {
               headers: ['Empresa', 'Contacto', 'Teléfono', 'Días de Visita'],
               data: proveedores.map((p) => [
                 p.empresa,
-                p.contacto,
+                p.nombre,
                 p.contacto,
                 p.diasVisita ?? ''
               ]).toList(),

@@ -31,7 +31,14 @@ class SyncException implements Exception {
 // Tablas a sincronizar (en orden: sin dependencias primero)
 // ──────────────────────────────────────────────────────────────────────────────
 
-const _syncTables = ['productos', 'proveedores', 'clientes', 'transacciones'];
+const _syncTables = [
+  'productos',
+  'proveedores',
+  'clientes',
+  'transacciones',
+  'fiados',
+  'abonos_fiados',
+];
 
 // ──────────────────────────────────────────────────────────────────────────────
 // SyncService
