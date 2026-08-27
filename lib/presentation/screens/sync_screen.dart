@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/services/sync_service.dart';
 import '../../core/theme/app_theme.dart';
+import '../providers/product_provider.dart';
+import '../providers/transaction_provider.dart';
+import '../providers/proveedor_provider.dart';
+import '../providers/fiado_provider.dart';
 
-class SyncScreen extends StatefulWidget {
+class SyncScreen extends ConsumerStatefulWidget {
   const SyncScreen({super.key});
 
   @override
-  State<SyncScreen> createState() => _SyncScreenState();
+  ConsumerState<SyncScreen> createState() => _SyncScreenState();
 }
 
-class _SyncScreenState extends State<SyncScreen>
+class _SyncScreenState extends ConsumerState<SyncScreen>
     with SingleTickerProviderStateMixin {
   final _syncService = SyncService();
 
@@ -96,7 +101,7 @@ class _SyncScreenState extends State<SyncScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'Para proteger tus datos y sincronizar las eliminaciones con Supabase, ingresa tu contraseña de inicio de sesión.',
+                  'Por motivos de seguridad, necesitamos confirmar tu contraseña para autorizar la sobrescritura y borrado de datos en la nube (Supabase).',
                   style: TextStyle(fontSize: 14),
                 ),
                 const SizedBox(height: 16),
@@ -142,6 +147,19 @@ class _SyncScreenState extends State<SyncScreen>
   }
 
   Future<void> _handleUpload() async {
+    // Advertencia explícita antes de pedir contraseña: el usuario debe entender
+    // que subir también elimina en la nube lo que no exista localmente.
+    final confirm = await _confirmAction(
+      '⚠️ Confirmar Subida',
+      'Esta acción subirá todos tus datos locales a Supabase y '
+      'eliminará en la nube cualquier registro que ya no exista en este dispositivo.\n\n'
+      '🔴 Si instalaste la app en un dispositivo nuevo y aún no has descargado tus datos, '
+      'presiona CANCELAR y descarga primero.\n\n'
+      '¿Deseas continuar con la subida?',
+      'Sí, Subir Datos',
+    );
+    if (!confirm) return;
+
     final password = await _promptForPassword();
     if (password == null) return;
 
@@ -187,6 +205,14 @@ class _SyncScreenState extends State<SyncScreen>
       final result = await _syncService.downloadData();
       if (mounted) {
         setState(() => _lastDownloadResult = result);
+        
+        // Actualizar los providers para que la interfaz se refresque en tiempo real
+        ref.invalidate(productsProvider);
+        ref.invalidate(transactionsProvider);
+        ref.invalidate(proveedoresProvider);
+        ref.invalidate(clientesProvider);
+        ref.invalidate(fiadosProvider);
+
         _showResultSnackBar(
           success: result.warnings.isEmpty,
           message: result.warnings.isEmpty

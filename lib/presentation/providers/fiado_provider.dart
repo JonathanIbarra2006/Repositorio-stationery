@@ -175,10 +175,12 @@ class ClientesNotifier extends StateNotifier<AsyncValue<List<Cliente>>> {
       String nombre, String cedula, String telefono, String? email) async {
     final db = await DatabaseHelper.instance.database;
     
-    // Validar cédula única
-    final existing = await db.query('clientes', where: 'cedula = ?', whereArgs: [cedula]);
-    if (existing.isNotEmpty) {
-      throw Exception('Ya existe un cliente registrado con esta cédula.');
+    // Validar cédula única (solo si no está vacía)
+    if (cedula.trim().isNotEmpty) {
+      final existing = await db.query('clientes', where: 'cedula = ?', whereArgs: [cedula]);
+      if (existing.isNotEmpty) {
+        throw Exception('Ya existe un cliente registrado con esta cédula.');
+      }
     }
 
     final randomStr = Random().nextInt(99999999).toString().padLeft(8, '0');
@@ -190,7 +192,8 @@ class ClientesNotifier extends StateNotifier<AsyncValue<List<Cliente>>> {
       'cedula': cedula,
       'telefono': telefono,
       'email': email,
-      'is_active': 1
+      'is_active': 1,
+      'updated_at': DateTime.now().toIso8601String(),
     });
     await loadClientes();
   }
@@ -200,10 +203,12 @@ class ClientesNotifier extends StateNotifier<AsyncValue<List<Cliente>>> {
       String? nuevoEmail) async {
     final db = await DatabaseHelper.instance.database;
     
-    // Validar cédula única
-    final existing = await db.query('clientes', where: 'cedula = ? AND id != ?', whereArgs: [nuevoCedula, id]);
-    if (existing.isNotEmpty) {
-      throw Exception('Ya existe otro cliente registrado con esta cédula.');
+    // Validar cédula única (solo si no está vacía)
+    if (nuevoCedula.trim().isNotEmpty) {
+      final existing = await db.query('clientes', where: 'cedula = ? AND id != ?', whereArgs: [nuevoCedula, id]);
+      if (existing.isNotEmpty) {
+        throw Exception('Ya existe otro cliente registrado con esta cédula.');
+      }
     }
 
     await db.update(
@@ -212,7 +217,8 @@ class ClientesNotifier extends StateNotifier<AsyncValue<List<Cliente>>> {
           'nombre': nuevoNombre,
           'cedula': nuevoCedula,
           'telefono': nuevoTelefono,
-          'email': nuevoEmail
+          'email': nuevoEmail,
+          'updated_at': DateTime.now().toIso8601String(),
         },
         where: 'id = ?',
         whereArgs: [id]);
@@ -288,7 +294,10 @@ class FiadosNotifier extends StateNotifier<AsyncValue<List<Fiado>>> {
     return (result.first['saldo'] as num).toDouble();
   }
 
-  /// Crea un nuevo fiado y registra la transacción correspondiente
+  /// Crea un nuevo fiado.
+  /// NOTA: NO se registra transacción de ingreso aquí porque el dinero
+  /// todavía no ha entrado a caja. El ingreso real se registra únicamente
+  /// cuando el cliente realiza un abono (ver registrarAbono).
   Future<String?> crearFiado({
     required String clienteId,
     required String nombreCliente,
@@ -301,36 +310,47 @@ class FiadosNotifier extends StateNotifier<AsyncValue<List<Fiado>>> {
       final id = const Uuid().v4();
       final fecha = DateTime.now();
 
-      // 1. Insertar el fiado
-      await db.insert('fiados', {
-        'id': id,
-        'cliente_id': clienteId,
-        'total': total,
-        'monto_pagado': 0.0,
-        'fecha': fecha.toIso8601String(),
-        'estado': 'pendiente',
-        'productos': productosDescripcion,
+      await db.transaction((txn) async {
+        // 1. Insertar el fiado
+        await txn.insert('fiados', {
+          'id': id,
+          'cliente_id': clienteId,
+          'total': total,
+          'monto_pagado': 0.0,
+          'fecha': fecha.toIso8601String(),
+          'estado': 'pendiente',
+          'productos': productosDescripcion,
+          'updated_at': fecha.toIso8601String(),
+        });
+
+        // 2. Validar y descontar stock de productos
+        for (final item in carritoItems) {
+          final cantidad = item['cantidad'] as int;
+          final productoId = item['productoId'] as String;
+          final nombre = item['nombre'] ?? 'Producto';
+
+          // Verificar stock disponible antes de descontar
+          final stockResult = await txn.rawQuery(
+            'SELECT stock FROM productos WHERE id = ?',
+            [productoId],
+          );
+          if (stockResult.isEmpty) {
+            throw Exception('Producto "$nombre" no encontrado en el inventario.');
+          }
+          final stockActual = stockResult.first['stock'] as int;
+          if (stockActual < cantidad) {
+            throw Exception('Stock insuficiente para "$nombre": disponible $stockActual, solicitado $cantidad.');
+          }
+
+          await txn.rawUpdate(
+            'UPDATE productos SET stock = stock - ?, updated_at = ? WHERE id = ?',
+            [cantidad, fecha.toIso8601String(), productoId],
+          );
+        }
       });
 
-      // 2. Descontar stock de productos
-      for (final item in carritoItems) {
-        await db.rawUpdate(
-          'UPDATE productos SET stock = stock - ? WHERE id = ?',
-          [item['cantidad'], item['productoId']],
-        );
-      }
-
-      // 3. Registrar transacción (ingreso pendiente - aparece en movimientos)
-      final transaccion = AppTransaction(
-        id: const Uuid().v4(),
-        tipo: TransactionType.ingreso,
-        monto: total,
-        fecha: fecha,
-        descripcion: 'Venta Fiada a $nombreCliente: $productosDescripcion',
-        categoria: 'Ventas Fiadas',
-        clienteId: clienteId,
-      );
-      await db.insert('transacciones', transaccion.toMap());
+      // (No se inserta transacción aquí para evitar doble conteo.
+      //  El ingreso se registra cuando el cliente abona.)
 
       await loadFiados();
       return null; // null = éxito
@@ -351,60 +371,67 @@ class FiadosNotifier extends StateNotifier<AsyncValue<List<Fiado>>> {
       final db = await DatabaseHelper.instance.database;
       final fecha = DateTime.now();
 
-      // 1. Obtener el fiado actual
-      final fiadoResult = await db.query(
-        'fiados',
-        where: 'id = ?',
-        whereArgs: [fiadoId],
-      );
-      if (fiadoResult.isEmpty) return 'Fiado no encontrado';
+      await db.transaction((txn) async {
+        // 1. Obtener el fiado actual
+        final fiadoResult = await txn.query(
+          'fiados',
+          where: 'id = ?',
+          whereArgs: [fiadoId],
+        );
+        if (fiadoResult.isEmpty) throw Exception('Fiado no encontrado');
 
-      final fiado = Fiado.fromMap(fiadoResult.first);
-      final nuevoMontoPagado = fiado.montoPagado + monto;
+        final fiado = Fiado.fromMap(fiadoResult.first);
+        final nuevoMontoPagado = fiado.montoPagado + monto;
 
-      if (monto > fiado.saldoPendiente) {
-        return 'El abono (\$${monto.toStringAsFixed(0)}) supera el saldo pendiente (\$${fiado.saldoPendiente.toStringAsFixed(0)})';
-      }
+        if (monto > fiado.saldoPendiente) {
+          throw Exception('El abono (\$${monto.toStringAsFixed(0)}) supera el saldo pendiente (\$${fiado.saldoPendiente.toStringAsFixed(0)})');
+        }
 
-      // 2. Determinar nuevo estado
-      String nuevoEstado;
-      if (nuevoMontoPagado >= fiado.total) {
-        nuevoEstado = 'saldado';
-      } else if (nuevoMontoPagado > 0) {
-        nuevoEstado = 'pagado_parcial';
-      } else {
-        nuevoEstado = 'pendiente';
-      }
+        // 2. Determinar nuevo estado
+        String nuevoEstado;
+        if (nuevoMontoPagado >= fiado.total) {
+          nuevoEstado = 'saldado';
+        } else if (nuevoMontoPagado > 0) {
+          nuevoEstado = 'pagado_parcial';
+        } else {
+          nuevoEstado = 'pendiente';
+        }
 
-      // 3. Insertar abono
-      await db.insert('abonos_fiados', {
-        'id': const Uuid().v4(),
-        'fiado_id': fiadoId,
-        'monto': monto,
-        'fecha': fecha.toIso8601String(),
-        'nota': nota,
+        // 3. Insertar abono
+        await txn.insert('abonos_fiados', {
+          'id': const Uuid().v4(),
+          'fiado_id': fiadoId,
+          'monto': monto,
+          'fecha': fecha.toIso8601String(),
+          'nota': nota,
+          'updated_at': fecha.toIso8601String(),
+        });
+
+        // 4. Actualizar el fiado
+        await txn.update(
+          'fiados',
+          {
+            'monto_pagado': nuevoMontoPagado,
+            'estado': nuevoEstado,
+            'updated_at': fecha.toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [fiadoId],
+        );
+
+        // 5. Registrar transacción (abono = ingreso de caja)
+        final notaDescripcion = (nota != null && nota.isNotEmpty) ? ' ($nota)' : '';
+        final transaccion = AppTransaction(
+          id: const Uuid().v4(),
+          tipo: TransactionType.ingreso,
+          monto: monto,
+          fecha: fecha,
+          descripcion: 'Abono Fiado de $nombreCliente$notaDescripcion',
+          categoria: 'Abonos Fiados',
+          clienteId: clienteId,
+        );
+        await txn.insert('transacciones', transaccion.toMap());
       });
-
-      // 4. Actualizar el fiado
-      await db.update(
-        'fiados',
-        {'monto_pagado': nuevoMontoPagado, 'estado': nuevoEstado},
-        where: 'id = ?',
-        whereArgs: [fiadoId],
-      );
-
-      // 5. Registrar transacción (abono = ingreso de caja)
-      final notaDescripcion = (nota != null && nota.isNotEmpty) ? ' ($nota)' : '';
-      final transaccion = AppTransaction(
-        id: const Uuid().v4(),
-        tipo: TransactionType.ingreso,
-        monto: monto,
-        fecha: fecha,
-        descripcion: 'Abono Fiado de $nombreCliente$notaDescripcion',
-        categoria: 'Abonos Fiados',
-        clienteId: clienteId,
-      );
-      await db.insert('transacciones', transaccion.toMap());
 
       // Recargar providers
       await loadFiados();

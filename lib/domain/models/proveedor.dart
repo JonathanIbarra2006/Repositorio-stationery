@@ -22,6 +22,7 @@ class Proveedor {
     'empresa': empresa,
     'dias_visita': diasVisita,
     'is_active': isActive ? 1 : 0,
+    'updated_at': DateTime.now().toIso8601String(),
   };
 
   factory Proveedor.fromMap(Map<String, dynamic> map) => Proveedor(

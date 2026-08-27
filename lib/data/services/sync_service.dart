@@ -94,10 +94,10 @@ class SyncService {
         final n = await _uploadTable(table, db, userId);
         counts[table] = n;
       } on SyncException catch (e) {
-        warnings.add('$table: ${e.message}');
+        warnings.add('${_getFriendlyTableName(table)}: ${e.message}');
         counts[table] = 0;
       } catch (e) {
-        warnings.add('$table: ${_mapSupabaseError(e)}');
+        warnings.add('${_getFriendlyTableName(table)}: ${_mapSupabaseError(e)}');
         counts[table] = 0;
       }
     }
@@ -118,8 +118,15 @@ class SyncService {
   ) async {
     final List<Map<String, dynamic>> localData = await db.query(tableName);
 
+    // Protección crítica: si no hay datos locales, salimos ANTES de ejecutar
+    // cualquier lógica de eliminación remota. Sin esto, una base vacía (p.ej.
+    // dispositivo nuevo) haría que se interpretara que TODOS los registros en
+    // Supabase deben borrarse, eliminando el respaldo completo del negocio.
+    if (localData.isEmpty) return 0;
+
     // 1. Sincronización de Eliminaciones
-    // Obtenemos los IDs remotos en Supabase
+    // Obtenemos los IDs remotos en Supabase y borramos los que ya no existen
+    // localmente. Esto solo se ejecuta si hay datos locales (guarda arriba).
     try {
       final remoteRecords = await _supabase.from(tableName).select('id').eq('user_id', userId);
       final remoteIds = remoteRecords.map((r) => r['id'].toString()).toSet();
@@ -134,8 +141,6 @@ class SyncService {
     } catch (e) {
       // Ignoramos errores de eliminación para no frenar el Upsert si la tabla aún no existe, etc.
     }
-
-    if (localData.isEmpty) return 0;
 
     // Columnas que se excluirán del payload por incompatibilidad con Supabase.
     // Se populan dinámicamente si Supabase responde con PGRST204.
@@ -210,10 +215,10 @@ class SyncService {
         final n = await _downloadTable(table, db, userId);
         counts[table] = n;
       } on SyncException catch (e) {
-        warnings.add('$table: ${e.message}');
+        warnings.add('${_getFriendlyTableName(table)}: ${e.message}');
         counts[table] = 0;
       } catch (e) {
-        warnings.add('$table: ${_mapSupabaseError(e)}');
+        warnings.add('${_getFriendlyTableName(table)}: ${_mapSupabaseError(e)}');
         counts[table] = 0;
       }
     }
@@ -268,34 +273,42 @@ class SyncService {
         );
 
         if (existing.isEmpty) {
-          // No existe localmente: Insertar nuevo
-          await txn.insert(
-            tableName,
-            localRecord,
-          );
+          // No existe localmente → Insertar como nuevo
+          await txn.insert(tableName, localRecord);
         } else {
-          // Existe localmente: Combinación inteligente (Merge)
+          // Existe localmente → Estrategia "última escritura gana" (last-write-wins)
+          // usando updated_at. Quien tenga el timestamp más reciente prevalece.
+          // Si el local no tiene updated_at (registros previos a v10), el remoto gana.
           final localRow = existing.first;
-          final updateMap = <String, dynamic>{};
+          final remoteUpdatedAt = localRecord['updated_at'] as String?;
+          final localUpdatedAt = localRow['updated_at'] as String?;
 
-          for (final key in localRecord.keys) {
-            final remoteVal = localRecord[key];
-            final localVal = localRow[key];
+          final bool remoteIsNewer;
+          if (remoteUpdatedAt == null) {
+            // Remoto no tiene timestamp → no sobreescribir
+            remoteIsNewer = false;
+          } else if (localUpdatedAt == null) {
+            // Local no tiene timestamp (registro antiguo) → el remoto gana
+            remoteIsNewer = true;
+          } else {
+            // Ambos tienen timestamp → comparar
+            remoteIsNewer = remoteUpdatedAt.compareTo(localUpdatedAt) > 0;
+          }
 
-            // Solo actualizamos si el local está vacío y el remoto tiene datos
-            if ((localVal == null || localVal == '') && (remoteVal != null && remoteVal != '')) {
-              updateMap[key] = remoteVal;
+          if (remoteIsNewer) {
+            // El remoto es más reciente: sobreescribir todos los campos locales
+            // con los valores remotos (excepto 'id' que ya es el mismo).
+            final updateMap = Map<String, dynamic>.from(localRecord)..remove('id');
+            if (updateMap.isNotEmpty) {
+              await txn.update(
+                tableName,
+                updateMap,
+                where: 'id = ?',
+                whereArgs: [id],
+              );
             }
           }
-
-          if (updateMap.isNotEmpty) {
-            await txn.update(
-              tableName,
-              updateMap,
-              where: 'id = ?',
-              whereArgs: [id],
-            );
-          }
+          // Si el local es más reciente (o igual), no se toca nada.
         }
       }
     });
@@ -323,22 +336,48 @@ class SyncService {
     return userId;
   }
 
+  String _getFriendlyTableName(String table) {
+    switch (table) {
+      case 'productos':
+        return 'Productos';
+      case 'proveedores':
+        return 'Proveedores';
+      case 'clientes':
+        return 'Clientes';
+      case 'transacciones':
+        return 'Transacciones';
+      case 'fiados':
+        return 'Clientes fiados';
+      case 'abonos_fiados':
+        return 'Abonos a deudas';
+      default:
+        return table;
+    }
+  }
+
   /// Traduce errores de Supabase/red a mensajes amigables en español.
   String _mapSupabaseError(Object e) {
     final raw = e.toString();
     final msg = raw.toLowerCase();
+
+    // Tabla no encontrada (PGRST205 / Could not find the table)
+    if (msg.contains('pgrst205') ||
+        msg.contains('could not find the table') ||
+        (msg.contains('schema cache') && msg.contains('table'))) {
+      return 'La tabla o sección no está disponible en la base de datos de la nube. Contacta al administrador.';
+    }
 
     // Columna no encontrada en Supabase (PGRST204)
     if (msg.contains('pgrst204') ||
         (msg.contains('could not find') && msg.contains('column'))) {
       final match = RegExp(r"find the '(\w+)' column").firstMatch(raw);
       final col = match?.group(1) ?? 'desconocida';
-      return 'La columna "$col" no existe en Supabase. Agrégala en el dashboard o es una columna solo local.';
+      return 'La columna "$col" no está configurada en el servidor. Contacta al administrador.';
     }
 
     // Columna user_id faltante
     if (msg.contains('column') && msg.contains('user_id')) {
-      return 'La tabla en Supabase no tiene la columna user_id. Agrégala en el dashboard.';
+      return 'Error de configuración de usuario en la base de datos. Contacta al administrador.';
     }
 
     // RLS / permisos
@@ -346,35 +385,37 @@ class SyncService {
         msg.contains('violates row-level') ||
         msg.contains('permission denied') ||
         msg.contains('insufficient_privilege')) {
-      return 'Sin permisos de escritura en Supabase. En el dashboard ve a Authentication → Policies y agrega una política INSERT/UPDATE para usuarios autenticados.';
+      return 'No tienes permisos de escritura para guardar datos en la nube. Contacta al administrador.';
     }
 
     // Tabla inexistente
     if (msg.contains('relation') && msg.contains('does not exist')) {
-      return 'La tabla no existe en Supabase. Créala primero en el dashboard de Supabase.';
+      return 'La tabla no existe en la base de datos de la nube. Contacta al administrador.';
     }
 
     // Sesión expirada
     if (msg.contains('jwt') ||
         msg.contains('expired') ||
         msg.contains('invalid token')) {
-      return 'Sesión expirada. Cierra sesión e inicia de nuevo.';
+      return 'Tu sesión de sincronización ha vencido. Por favor, vuelve a iniciar sesión.';
     }
 
     // Problemas de red
     if (msg.contains('network') ||
         msg.contains('socket') ||
         msg.contains('connection refused')) {
-      return 'Error de red. Verifica tu conexión a internet.';
+      return 'Sin conexión con el servidor. Revisa tu conexión a internet e inténtalo de nuevo.';
     }
 
     if (msg.contains('timeout')) {
-      return 'Tiempo de espera agotado. Intenta de nuevo.';
+      return 'Se agotó el tiempo de espera del servidor. Inténtalo de nuevo.';
     }
 
-    // Error genérico: devuelve el mensaje real sin prefijos de excepción
+    // Error genérico: devuelve el mensaje real sin prefijos de excepción, limpio
     return raw
         .replaceAll('Exception: ', '')
-        .replaceAll('SyncException: ', '');
+        .replaceAll('SyncException: ', '')
+        .replaceAll('PostgrestException: ', '')
+        .trim();
   }
 }

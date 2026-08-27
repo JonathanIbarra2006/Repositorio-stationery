@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../domain/models/product.dart';
-import '../../domain/models/transaction.dart';
 import '../providers/product_provider.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/fiado_provider.dart';
@@ -731,28 +730,22 @@ class _VentaDeContadoScreenState
     await Future.delayed(const Duration(milliseconds: 300));
 
     try {
-      final fecha = DateTime.now();
-      final descripcionVenta =
-          _carrito.entries.map((e) => '${e.value}x ${e.key.nombre}').join(', ');
-
-      for (var entry in _carrito.entries) {
-        final nuevoProducto =
-            entry.key.copyWith(stock: entry.key.stock - entry.value);
-        await ref.read(productsProvider.notifier).editProduct(nuevoProducto);
-      }
-
-      final nuevaTransaccion = AppTransaction(
-        id: _uuid(),
-        tipo: TransactionType.ingreso,
-        monto: _totalVenta,
-        fecha: fecha,
-        descripcion: 'Venta Contado: $descripcionVenta',
-        categoria: 'Ventas Mostrador',
-      );
+      final carritoItems = _carrito.entries
+          .map((e) => {
+                'productoId': e.key.id,
+                'nombre': e.key.nombre,
+                'cantidad': e.value,
+                'precio': e.key.precio,
+              })
+          .toList();
 
       await ref
-          .read(transactionsProvider.notifier)
-          .addTransaction(nuevaTransaccion);
+          .read(transactionRepoProvider)
+          .registrarVentaContado(carritoItems, _totalVenta);
+
+      // Refrescar providers para actualizar la interfaz
+      ref.invalidate(productsProvider);
+      ref.invalidate(transactionsProvider);
 
       if (mounted) {
         setState(() => _procesando = false);
@@ -915,10 +908,7 @@ class _VentaDeContadoScreenState
     }
   }
 
-  String _uuid() {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return 'txn-$now';
-  }
+
 
   void _mostrarError(String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(

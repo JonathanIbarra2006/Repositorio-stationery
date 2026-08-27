@@ -111,8 +111,20 @@ class _NuevaTransaccionScreenState extends ConsumerState<NuevaTransaccionScreen>
                 label: 'Monto *',
                 icon: Icons.attach_money_rounded,
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (v) => v == null || v.isEmpty ? 'Requerido' : null,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(9), // Limita a 999,999,999
+                ],
+                validator: (v) {
+                  if (v == null || v.isEmpty) {
+                    return 'Requerido';
+                  }
+                  final monto = double.tryParse(v);
+                  if (monto == null || monto <= 0) {
+                    return 'Solo se permiten montos mayores a cero';
+                  }
+                  return null;
+                },
                 accentColor: colorPrincipal,
               ),
               

@@ -19,7 +19,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 9,
+      version: 11,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -37,7 +37,8 @@ class DatabaseHelper {
         codigo_barras TEXT,
         proveedor TEXT NOT NULL,
         stock_minimo INTEGER DEFAULT 5,
-        is_active INTEGER DEFAULT 1
+        is_active INTEGER DEFAULT 1,
+        updated_at TEXT
       )
     ''');
 
@@ -50,7 +51,8 @@ class DatabaseHelper {
         fecha TEXT NOT NULL,
         descripcion TEXT NOT NULL,
         categoria TEXT NOT NULL,
-        cliente_id TEXT
+        cliente_id TEXT,
+        updated_at TEXT
       )
     ''');
 
@@ -62,7 +64,8 @@ class DatabaseHelper {
         contacto TEXT NOT NULL,
         empresa TEXT NOT NULL,
         dias_visita TEXT,
-        is_active INTEGER DEFAULT 1
+        is_active INTEGER DEFAULT 1,
+        updated_at TEXT
       )
     ''');
 
@@ -74,8 +77,15 @@ class DatabaseHelper {
         cedula TEXT,
         telefono TEXT,
         email TEXT,
-        is_active INTEGER DEFAULT 1
+        is_active INTEGER DEFAULT 1,
+        updated_at TEXT
       )
+    ''');
+    
+    await db.execute('''
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_cedula 
+      ON clientes(cedula) 
+      WHERE cedula IS NOT NULL AND cedula != ''
     ''');
 
     // 5. Fiados
@@ -88,6 +98,7 @@ class DatabaseHelper {
         fecha TEXT NOT NULL,
         estado TEXT NOT NULL,
         productos TEXT,
+        updated_at TEXT,
         FOREIGN KEY (cliente_id) REFERENCES clientes (id)
       )
     ''');
@@ -100,6 +111,7 @@ class DatabaseHelper {
         monto REAL NOT NULL,
         fecha TEXT NOT NULL,
         nota TEXT,
+        updated_at TEXT,
         FOREIGN KEY (fiado_id) REFERENCES fiados (id)
       )
     ''');
@@ -157,6 +169,29 @@ class DatabaseHelper {
       await db.execute(
         'ALTER TABLE clientes ADD COLUMN cedula TEXT',
       );
+    }
+    if (oldVersion < 10) {
+      // Agrega updated_at a todas las tablas para sincronización multi-dispositivo
+      // "última escritura gana" (last-write-wins).
+      for (final table in [
+        'productos',
+        'transacciones',
+        'proveedores',
+        'clientes',
+        'fiados',
+        'abonos_fiados',
+      ]) {
+        await db.execute(
+          'ALTER TABLE $table ADD COLUMN updated_at TEXT',
+        );
+      }
+    }
+    if (oldVersion < 11) {
+      await db.execute('''
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_cedula 
+        ON clientes(cedula) 
+        WHERE cedula IS NOT NULL AND cedula != ''
+      ''');
     }
   }
 

@@ -20,9 +20,10 @@ class TransactionRepository {
 
     if (startDate != null && endDate != null) {
       whereClause = 'fecha >= ? AND fecha <= ?';
-      // MAGIA SENIOR: Le sumamos 23h 59m 59s al día final para incluir todas las ventas de ese último día
-      final endOfDay = endDate.add(const Duration(hours: 23, minutes: 59, seconds: 59));
-      whereArgs = [startDate.toIso8601String(), endOfDay.toIso8601String()];
+      // MAGIA SENIOR: Normalizamos para que incluya todo el día inicial y final completo
+      final startOfDay = DateTime(startDate.year, startDate.month, startDate.day);
+      final endOfDay = DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
+      whereArgs = [startOfDay.toIso8601String(), endOfDay.toIso8601String()];
     }
 
     final maps = await db.query(
@@ -38,12 +39,34 @@ class TransactionRepository {
   Future<void> registrarVentaContado(List<Map<String, dynamic>> carrito, double totalVenta) async {
     final db = await dbHelper.database;
     await db.transaction((txn) async {
+      final now = DateTime.now().toIso8601String();
+
       for (var item in carrito) {
+        final cantidad = item['cantidad'] as int;
+        final productoId = item['productoId'] as String;
+        final nombre = item['nombre'] ?? 'Producto';
+
+        // Verificar stock disponible antes de descontar (evita stock negativo)
+        final stockResult = await txn.rawQuery(
+          'SELECT stock FROM productos WHERE id = ?',
+          [productoId],
+        );
+        if (stockResult.isEmpty) {
+          throw Exception('Producto "$nombre" no encontrado en el inventario.');
+        }
+        final stockActual = stockResult.first['stock'] as int;
+        if (stockActual < cantidad) {
+          throw Exception(
+            'Stock insuficiente para "$nombre": disponible $stockActual, solicitado $cantidad.',
+          );
+        }
+
         await txn.rawUpdate(
-            'UPDATE productos SET stock = stock - ? WHERE id = ?',
-            [item['cantidad'], item['productoId']]
+          'UPDATE productos SET stock = stock - ?, updated_at = ? WHERE id = ?',
+          [cantidad, now, productoId],
         );
       }
+
       // Importante: asegúrate de tener import 'package:uuid/uuid.dart'; arriba en este archivo
       final ingreso = AppTransaction(
         id: const Uuid().v4(),

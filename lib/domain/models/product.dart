@@ -56,6 +56,7 @@ class Product {
       'proveedor': proveedor,
       'stock_minimo': stockMinimo,
       'is_active': isActive ? 1 : 0,
+      'updated_at': DateTime.now().toIso8601String(),
     };
   }
 

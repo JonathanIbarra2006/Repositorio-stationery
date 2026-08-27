@@ -2,6 +2,16 @@ import 'package:sqflite/sqflite.dart';
 import '../../domain/models/product.dart';
 import '../datasources/database_helper.dart';
 
+/// Excepción tipada para códigos de barra duplicados.
+/// Permite capturarla con `is DuplicateBarcodeException` en vez de
+/// comparar strings frágiles como `.contains('DUPLICADO')`.
+class DuplicateBarcodeException implements Exception {
+  final String barcode;
+  const DuplicateBarcodeException(this.barcode);
+  @override
+  String toString() => 'DuplicateBarcodeException: El código "$barcode" ya existe.';
+}
+
 class ProductRepository {
   final dbHelper = DatabaseHelper.instance;
 
@@ -33,7 +43,7 @@ class ProductRepository {
     // Validación: No permitir códigos de barra duplicados si existen
     if (product.codigoBarras != null && product.codigoBarras!.isNotEmpty) {
       final duplicado = await db.query('productos', where: 'codigo_barras = ?', whereArgs: [product.codigoBarras]);
-      if (duplicado.isNotEmpty) throw Exception('Código de barras ya existe');
+      if (duplicado.isNotEmpty) throw DuplicateBarcodeException(product.codigoBarras!);
     }
 
     await db.insert('productos', product.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
@@ -44,7 +54,7 @@ class ProductRepository {
     final db = await dbHelper.database;
     await db.update(
         'productos',
-        {'is_active': 0},
+        {'is_active': 0, 'updated_at': DateTime.now().toIso8601String()},
         where: 'id = ?',
         whereArgs: [id]);
   }
@@ -53,7 +63,7 @@ class ProductRepository {
     final db = await dbHelper.database;
     await db.update(
         'productos',
-        {'is_active': 1},
+        {'is_active': 1, 'updated_at': DateTime.now().toIso8601String()},
         where: 'id = ?',
         whereArgs: [id]);
   }

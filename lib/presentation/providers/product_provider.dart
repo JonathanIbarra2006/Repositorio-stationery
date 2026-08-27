@@ -28,8 +28,8 @@ class ProductNotifier extends StateNotifier<AsyncValue<List<Product>>> {
       loadProducts(); // Recarga la lista tras agregar
       return null; // Null significa "Sin errores"
     } catch (e) {
-      if (e.toString().contains('DUPLICADO')) {
-        return 'El producto ya está registrado en el inventario.';
+      if (e is DuplicateBarcodeException) {
+        return 'El producto ya está registrado en el inventario con ese código de barras.';
       }
       return 'Error al guardar el producto.';
     }

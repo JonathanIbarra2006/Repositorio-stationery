@@ -24,12 +24,12 @@ class ProveedorRepository {
 
   Future<void> desactivarProveedor(String id) async {
     final db = await dbHelper.database;
-    await db.update('proveedores', {'is_active': 0}, where: 'id = ?', whereArgs: [id]);
+    await db.update('proveedores', {'is_active': 0, 'updated_at': DateTime.now().toIso8601String()}, where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> reactivarProveedor(String id) async {
     final db = await dbHelper.database;
-    await db.update('proveedores', {'is_active': 1}, where: 'id = ?', whereArgs: [id]);
+    await db.update('proveedores', {'is_active': 1, 'updated_at': DateTime.now().toIso8601String()}, where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> eliminarProveedorPermanentemente(String id) async {

@@ -51,7 +51,7 @@ class ExcelGenerator {
       sheet.appendRow([
         TextCellValue(DateFormat('dd/MM/yyyy HH:mm').format(t.fecha)),
         TextCellValue(t.tipo.toString().split('.').last.toUpperCase()),
-        TextCellValue(t.categoria ?? 'General'),
+        TextCellValue(t.categoria),
         TextCellValue(t.descripcion),
         DoubleCellValue(t.monto),
       ]);

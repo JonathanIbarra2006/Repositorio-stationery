@@ -58,12 +58,13 @@ class TransactionNotifier extends StateNotifier<AsyncValue<TransactionState>> {
     }
   }
 
-  Future<void> deleteTransaction(String id) async {
+  Future<String?> deleteTransaction(String id) async {
     try {
       await _repository.deleteTransaction(id);
       loadTransactions();
+      return null;
     } catch (e) {
-      // Manejar el error apropiadamente
+      return 'Error al eliminar la transacción.';
     }
   }
 }

@@ -323,7 +323,7 @@ class _ResumenTab extends ConsumerWidget {
         
         for (var t in state.transactions) {
           if (t.tipo == TransactionType.ingreso) {
-            final cat = t.categoria ?? 'Otros';
+            final cat = t.categoria;
             dist[cat] = (dist[cat] ?? 0) + t.monto;
             
             if (t.clienteId != null) {

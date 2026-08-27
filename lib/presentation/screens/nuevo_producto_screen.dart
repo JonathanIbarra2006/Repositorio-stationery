@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -205,7 +206,17 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
                       label: 'Stock Inicial *',
                       icon: Icons.layers_outlined,
                       keyboardType: TextInputType.number,
-                      validator: (v) => v == null || v.isEmpty ? 'Requerido' : null,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(7),
+                      ],
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Requerido';
+                        final n = int.tryParse(v.trim());
+                        if (n == null) return 'Ingresa un número entero válido';
+                        if (n < 0) return 'No puede ser negativo';
+                        return null;
+                      },
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -215,6 +226,17 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
                       label: 'Stock Mínimo',
                       icon: Icons.warning_amber_rounded,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(7),
+                      ],
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return null; // Opcional
+                        final n = int.tryParse(v.trim());
+                        if (n == null) return 'Ingresa un número entero válido';
+                        if (n < 0) return 'No puede ser negativo';
+                        return null;
+                      },
                     ),
                   ),
                 ],
@@ -224,8 +246,18 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
                 controller: _precioCtrl,
                 label: 'Precio de Venta *',
                 icon: Icons.attach_money_rounded,
-                keyboardType: TextInputType.number,
-                validator: (v) => v == null || v.isEmpty ? 'Requerido' : null,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                  LengthLimitingTextInputFormatter(10),
+                ],
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Requerido';
+                  final n = double.tryParse(v.trim());
+                  if (n == null) return 'Ingresa un número válido (usa punto para decimales)';
+                  if (n <= 0) return 'El precio debe ser mayor a \$0';
+                  return null;
+                },
               ),
 
               const SizedBox(height: 32),
@@ -331,6 +363,7 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
     Widget? suffix,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
@@ -345,6 +378,7 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
         controller: controller,
         keyboardType: keyboardType,
         validator: validator,
+        inputFormatters: inputFormatters,
         style: TextStyle(color: isDark ? Colors.white : kNavy, fontWeight: FontWeight.w600),
         decoration: InputDecoration(
           labelText: label,

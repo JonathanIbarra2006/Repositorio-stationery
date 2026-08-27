@@ -5,7 +5,7 @@ class AppTransaction {
   final TransactionType tipo;
   final double monto;
   final DateTime fecha;
-  final String? categoria; // Obligatorio para gastos, opcional para ingresos rápidos
+  final String categoria; // Obligatorio (NOT NULL en SQLite)
   final String descripcion;
   final String? clienteId; // Opcional: para saber qué cliente realizó la compra
 
@@ -14,7 +14,7 @@ class AppTransaction {
     required this.tipo,
     required this.monto,
     required this.fecha,
-    this.categoria,
+    required this.categoria,
     required this.descripcion,
     this.clienteId,
   });
@@ -28,6 +28,7 @@ class AppTransaction {
       'categoria': categoria,
       'descripcion': descripcion,
       'cliente_id': clienteId,
+      'updated_at': DateTime.now().toIso8601String(),
     };
   }
 

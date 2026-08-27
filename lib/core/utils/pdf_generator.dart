@@ -199,7 +199,7 @@ class PdfGenerator {
                 DateFormat('dd/MM/yy').format(t.fecha),
                 t.tipo.toString().split('.').last.toUpperCase(),
                 t.descripcion,
-                t.categoria ?? 'General',
+                t.categoria,
                 currency.format(t.monto)
               ]).toList(),
               border: const pw.TableBorder(horizontalInside: pw.BorderSide(color: PdfColors.grey300)),

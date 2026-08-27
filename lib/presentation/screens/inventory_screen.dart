@@ -41,7 +41,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 error: (e, _) => Center(child: Text('Error: $e')),
                 data: (allProducts) {
                   final totalProductosCount = allProducts.length;
-                  final stockBajoCount = allProducts.where((p) => p.stock <= 5).length;
+                  final stockBajoCount = allProducts.where((p) => p.stock <= p.stockMinimo).length;
                   final valorTotalInventario = allProducts.fold(0.0, (sum, p) => sum + (p.precio * p.stock));
 
                   return ListView(
@@ -363,7 +363,7 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final esStockBajo = product.stock <= 5;
+    final esStockBajo = product.stock <= product.stockMinimo;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
