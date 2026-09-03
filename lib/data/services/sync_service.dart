@@ -1,7 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/datasources/database_helper.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_sqlcipher/sqflite.dart';
+
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Resultado tipado de sincronización
@@ -97,7 +98,7 @@ class SyncService {
         warnings.add('${_getFriendlyTableName(table)}: ${e.message}');
         counts[table] = 0;
       } catch (e) {
-        warnings.add('${_getFriendlyTableName(table)}: ${_mapSupabaseError(e)}');
+        warnings.add('${_getFriendlyTableName(table)}: ${_mapAnyError(e)}');
         counts[table] = 0;
       }
     }
@@ -218,7 +219,7 @@ class SyncService {
         warnings.add('${_getFriendlyTableName(table)}: ${e.message}');
         counts[table] = 0;
       } catch (e) {
-        warnings.add('${_getFriendlyTableName(table)}: ${_mapSupabaseError(e)}');
+        warnings.add('${_getFriendlyTableName(table)}: ${_mapAnyError(e)}');
         counts[table] = 0;
       }
     }
@@ -249,69 +250,84 @@ class SyncService {
 
     if (remoteData.isEmpty) return 0;
 
-    await db.transaction((Transaction txn) async {
-      for (final record in remoteData) {
-        final raw = Map<String, dynamic>.from(record as Map);
+    // ── Deshabilitar FK durante la sincronización ────────────────────────────
+    // Los datos vienen de Supabase, que ya garantiza integridad referencial.
+    // Deshabilitar FK evita errores de orden de inserción (p.ej. fiados que
+    // referencian clientes que aún no han sido insertados en esta transacción).
+    // Se re-habilitan automáticamente al cerrar la transacción.
+    await db.execute('PRAGMA foreign_keys = OFF');
+    try {
+      await db.transaction((Transaction txn) async {
+        for (final record in remoteData) {
+          final raw = Map<String, dynamic>.from(record as Map);
 
-        // Quita user_id (columna de Supabase, no existe localmente)
-        raw.remove('user_id');
+          // Quita user_id (columna de Supabase, no existe localmente)
+          raw.remove('user_id');
 
-        // Filtra sólo columnas que existen en el SQLite local
-        final localRecord = Map<String, dynamic>.fromEntries(
-          raw.entries.where((e) => localCols.contains(e.key)),
-        );
+          // Filtra sólo columnas que existen en el SQLite local
+          final localRecord = Map<String, dynamic>.fromEntries(
+            raw.entries.where((e) => localCols.contains(e.key)),
+          );
 
-        if (localRecord.isEmpty) continue;
+          if (localRecord.isEmpty) continue;
 
-        final id = localRecord['id'];
-        if (id == null) continue;
+          final id = localRecord['id'];
+          if (id == null) continue;
 
-        final existing = await txn.query(
-          tableName,
-          where: 'id = ?',
-          whereArgs: [id],
-        );
+          final existing = await txn.query(
+            tableName,
+            where: 'id = ?',
+            whereArgs: [id],
+          );
 
-        if (existing.isEmpty) {
-          // No existe localmente → Insertar como nuevo
-          await txn.insert(tableName, localRecord);
-        } else {
-          // Existe localmente → Estrategia "última escritura gana" (last-write-wins)
-          // usando updated_at. Quien tenga el timestamp más reciente prevalece.
-          // Si el local no tiene updated_at (registros previos a v10), el remoto gana.
-          final localRow = existing.first;
-          final remoteUpdatedAt = localRecord['updated_at'] as String?;
-          final localUpdatedAt = localRow['updated_at'] as String?;
-
-          final bool remoteIsNewer;
-          if (remoteUpdatedAt == null) {
-            // Remoto no tiene timestamp → no sobreescribir
-            remoteIsNewer = false;
-          } else if (localUpdatedAt == null) {
-            // Local no tiene timestamp (registro antiguo) → el remoto gana
-            remoteIsNewer = true;
+          if (existing.isEmpty) {
+            // No existe localmente → Insertar como nuevo
+            await txn.insert(
+              tableName,
+              localRecord,
+              conflictAlgorithm: ConflictAlgorithm.ignore,
+            );
           } else {
-            // Ambos tienen timestamp → comparar
-            remoteIsNewer = remoteUpdatedAt.compareTo(localUpdatedAt) > 0;
-          }
+            // Existe localmente → Estrategia "última escritura gana" (last-write-wins)
+            // usando updated_at. Quien tenga el timestamp más reciente prevalece.
+            // Si el local no tiene updated_at (registros previos a v10), el remoto gana.
+            final localRow = existing.first;
+            final remoteUpdatedAt = localRecord['updated_at'] as String?;
+            final localUpdatedAt = localRow['updated_at'] as String?;
 
-          if (remoteIsNewer) {
-            // El remoto es más reciente: sobreescribir todos los campos locales
-            // con los valores remotos (excepto 'id' que ya es el mismo).
-            final updateMap = Map<String, dynamic>.from(localRecord)..remove('id');
-            if (updateMap.isNotEmpty) {
-              await txn.update(
-                tableName,
-                updateMap,
-                where: 'id = ?',
-                whereArgs: [id],
-              );
+            final bool remoteIsNewer;
+            if (remoteUpdatedAt == null) {
+              // Remoto no tiene timestamp → no sobreescribir
+              remoteIsNewer = false;
+            } else if (localUpdatedAt == null) {
+              // Local no tiene timestamp (registro antiguo) → el remoto gana
+              remoteIsNewer = true;
+            } else {
+              // Ambos tienen timestamp → comparar
+              remoteIsNewer = remoteUpdatedAt.compareTo(localUpdatedAt) > 0;
             }
+
+            if (remoteIsNewer) {
+              // El remoto es más reciente: sobreescribir todos los campos locales
+              // con los valores remotos (excepto 'id' que ya es el mismo).
+              final updateMap = Map<String, dynamic>.from(localRecord)..remove('id');
+              if (updateMap.isNotEmpty) {
+                await txn.update(
+                  tableName,
+                  updateMap,
+                  where: 'id = ?',
+                  whereArgs: [id],
+                );
+              }
+            }
+            // Si el local es más reciente (o igual), no se toca nada.
           }
-          // Si el local es más reciente (o igual), no se toca nada.
         }
-      }
-    });
+      });
+    } finally {
+      // Re-habilitar FK siempre, incluso si hubo error en la transacción
+      await db.execute('PRAGMA foreign_keys = ON');
+    }
 
     return remoteData.length;
   }
@@ -355,29 +371,79 @@ class SyncService {
     }
   }
 
+  // ── Mapeo de errores ─────────────────────────────────────────────────────
+
+  /// Punto de entrada único: detecta si es un error local (SQLite) o remoto
+  /// (Supabase/red) y lo traduce al mensaje amigable correspondiente.
+  String _mapAnyError(Object e) {
+    final raw = e.toString();
+    final msg = raw.toLowerCase();
+
+    // ── Errores locales de SQLite ─────────────────────────────────────────
+
+    // Violación de clave foránea (código 787)
+    if (msg.contains('foreign key constraint') ||
+        msg.contains('code 787') ||
+        msg.contains('foreign key')) {
+      return 'Un registro depende de otro que aún no está guardado localmente. '
+          'Intenta sincronizar de nuevo.';
+    }
+
+    // Violación de unicidad / duplicado (código 2067 / UNIQUE constraint)
+    if (msg.contains('unique constraint') ||
+        msg.contains('code 2067') ||
+        msg.contains('unique')) {
+      return 'Este registro ya existe localmente con un valor duplicado. '
+          'No se sobreescribió para proteger tus datos.';
+    }
+
+    // Base de datos bloqueada (otro proceso la está usando)
+    if (msg.contains('database is locked') ||
+        msg.contains('code 5') && msg.contains('sqlite')) {
+      return 'La base de datos local está ocupada. Cierra la app y vuelve a intentarlo.';
+    }
+
+    // Disco lleno o error de escritura
+    if (msg.contains('disk') ||
+        msg.contains('full') ||
+        msg.contains('no space')) {
+      return 'Sin espacio disponible en el dispositivo. Libera espacio e intenta de nuevo.';
+    }
+
+    // Tabla o columna no encontrada localmente
+    if (msg.contains('no such table') || msg.contains('no such column')) {
+      return 'La estructura de la base de datos local está desactualizada. '
+          'Actualiza la app e intenta de nuevo.';
+    }
+
+    // ── Errores remotos de Supabase / red ────────────────────────────────
+    return _mapSupabaseError(e);
+  }
+
   /// Traduce errores de Supabase/red a mensajes amigables en español.
   String _mapSupabaseError(Object e) {
     final raw = e.toString();
     final msg = raw.toLowerCase();
 
-    // Tabla no encontrada (PGRST205 / Could not find the table)
+    // Tabla no encontrada (PGRST205)
     if (msg.contains('pgrst205') ||
         msg.contains('could not find the table') ||
         (msg.contains('schema cache') && msg.contains('table'))) {
-      return 'La tabla o sección no está disponible en la base de datos de la nube. Contacta al administrador.';
+      return 'Esta sección no está disponible en la nube todavía. '
+          'Contacta al administrador para configurarla.';
     }
 
     // Columna no encontrada en Supabase (PGRST204)
     if (msg.contains('pgrst204') ||
         (msg.contains('could not find') && msg.contains('column'))) {
-      final match = RegExp(r"find the '(\w+)' column").firstMatch(raw);
-      final col = match?.group(1) ?? 'desconocida';
-      return 'La columna "$col" no está configurada en el servidor. Contacta al administrador.';
+      return 'Hay un campo de datos que no está configurado en el servidor. '
+          'La sincronización continuó con los campos disponibles.';
     }
 
     // Columna user_id faltante
     if (msg.contains('column') && msg.contains('user_id')) {
-      return 'Error de configuración de usuario en la base de datos. Contacta al administrador.';
+      return 'Error de configuración en la nube: falta la columna de usuario. '
+          'Contacta al administrador.';
     }
 
     // RLS / permisos
@@ -385,37 +451,62 @@ class SyncService {
         msg.contains('violates row-level') ||
         msg.contains('permission denied') ||
         msg.contains('insufficient_privilege')) {
-      return 'No tienes permisos de escritura para guardar datos en la nube. Contacta al administrador.';
+      return 'No tienes permiso para guardar datos en la nube. '
+          'Verifica que tu cuenta esté activa o contacta al administrador.';
     }
 
-    // Tabla inexistente
+    // Tabla inexistente (SQL relation)
     if (msg.contains('relation') && msg.contains('does not exist')) {
-      return 'La tabla no existe en la base de datos de la nube. Contacta al administrador.';
+      return 'Esta tabla no existe en la base de datos de la nube. '
+          'Contacta al administrador para crearla.';
     }
 
-    // Sesión expirada
+    // Sesión expirada / token inválido
     if (msg.contains('jwt') ||
         msg.contains('expired') ||
-        msg.contains('invalid token')) {
-      return 'Tu sesión de sincronización ha vencido. Por favor, vuelve a iniciar sesión.';
+        msg.contains('invalid token') ||
+        msg.contains('not authenticated')) {
+      return 'Tu sesión ha expirado. Cierra sesión, vuelve a iniciarla e intenta de nuevo.';
     }
 
-    // Problemas de red
+    // Sin conexión / error de red
     if (msg.contains('network') ||
         msg.contains('socket') ||
-        msg.contains('connection refused')) {
-      return 'Sin conexión con el servidor. Revisa tu conexión a internet e inténtalo de nuevo.';
+        msg.contains('connection refused') ||
+        msg.contains('unreachable') ||
+        msg.contains('failed host lookup')) {
+      return 'No se pudo conectar al servidor. Revisa tu conexión a internet e intenta de nuevo.';
     }
 
-    if (msg.contains('timeout')) {
-      return 'Se agotó el tiempo de espera del servidor. Inténtalo de nuevo.';
+    // Tiempo de espera agotado
+    if (msg.contains('timeout') || msg.contains('timed out')) {
+      return 'El servidor tardó demasiado en responder. Inténtalo de nuevo en unos momentos.';
     }
 
-    // Error genérico: devuelve el mensaje real sin prefijos de excepción, limpio
-    return raw
+    // Límite de solicitudes (rate limit)
+    if (msg.contains('rate limit') || msg.contains('too many requests') || msg.contains('429')) {
+      return 'Demasiadas solicitudes al servidor. Espera unos segundos e intenta de nuevo.';
+    }
+
+    // Servidor caído / error interno
+    if (msg.contains('500') || msg.contains('503') || msg.contains('internal server error')) {
+      return 'El servidor de la nube está teniendo problemas. Intenta más tarde.';
+    }
+
+    // Error genérico: limpio, sin prefijos técnicos
+    final clean = raw
         .replaceAll('Exception: ', '')
         .replaceAll('SyncException: ', '')
         .replaceAll('PostgrestException: ', '')
+        .replaceAll('DatabaseException(', '')
+        .replaceAll(')', '')
         .trim();
+
+    // Si el texto limpio sigue siendo muy técnico, dar mensaje genérico
+    if (clean.length > 120 || clean.contains('sql') || clean.contains('INSERT')) {
+      return 'Ocurrió un error inesperado al sincronizar. Intenta de nuevo o contacta al soporte.';
+    }
+
+    return clean;
   }
 }

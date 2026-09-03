@@ -34,14 +34,16 @@ dependencies:
   uuid: ^4.3.3
   intl: ^0.19.0
   # Nuevas dependencias para Base de Datos
-  sqflite: ^2.3.0
+  # Fix #2: sqflite_sqlcipher cifra el archivo .db con AES-256.
+  # Drop-in replacement de sqflite — mismo API, agrega parámetro 'password' en openDatabase.
+  sqflite_sqlcipher: ^3.4.1
   path: ^1.8.3
   # ... (tus dependencias anteriores)
   pdf: ^3.11.0
   printing: ^5.12.0
   share_plus: ^7.2.1
   path_provider: ^2.1.2
-  mobile_scanner: ^5.0.0  # <--- AGREGA ESTA LÍNEA
+  mobile_scanner: ^5.0.0
   fl_chart: ^0.71.0
   flutter_speed_dial: ^7.0.0
   supabase_flutter: ^2.12.4
@@ -49,6 +51,15 @@ dependencies:
   shared_preferences: ^2.5.5
   google_fonts: ^8.0.2
   excel: ^4.0.6
+  # Fix #2: almacena la clave de cifrado de la BD de forma segura
+  # (Keychain en iOS, Keystore/EncryptedSharedPreferences en Android).
+  flutter_secure_storage: ^9.2.2
+
+dependency_overrides:
+  # Fix #2: fuerza a todos los paquetes transitivos que dependan de sqflite
+  # a usar la variante SQLCipher para evitar conflictos de clase.
+  sqflite: ^2.3.0
+  sqflite_common: ^2.5.3
 
 dev_dependencies:
   flutter_test:

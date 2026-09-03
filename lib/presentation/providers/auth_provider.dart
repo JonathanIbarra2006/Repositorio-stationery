@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../data/datasources/database_helper.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Excepciones de autenticación tipadas
@@ -105,14 +107,53 @@ class AuthNotifier extends StateNotifier<User?> {
     );
   }
 
+  /// Clave usada en SharedPreferences para recordar el último user_id autenticado.
+  static const _kLastUserId = 'klip_last_user_id';
+
+  /// Borra todas las tablas locales para evitar que una cuenta vea datos de otra.
+  Future<void> _clearLocalDatabase() async {
+    final db = await DatabaseHelper.instance.database;
+    // Desactivar FK temporalmente para borrar en cualquier orden
+    await db.execute('PRAGMA foreign_keys = OFF');
+    await db.transaction((txn) async {
+      for (final table in [
+        'abonos_fiados',
+        'fiados',
+        'transacciones',
+        'clientes',
+        'proveedores',
+        'productos',
+      ]) {
+        await txn.delete(table);
+      }
+    });
+    await db.execute('PRAGMA foreign_keys = ON');
+  }
+
   Future<void> signIn(String email, String password) async {
+    // 1. Autenticar en Supabase — errores aquí se mapean a AuthException legibles.
+    final AuthResponse response;
     try {
-      await Supabase.instance.client.auth.signInWithPassword(
+      response = await Supabase.instance.client.auth.signInWithPassword(
         email: email,
         password: password,
       );
     } catch (e) {
       throw _mapError(e);
+    }
+
+    // 2. Fix #1: detectar cambio de cuenta en el mismo dispositivo.
+    // Se hace fuera del try/catch de auth para que un fallo de BD no quede
+    // envuelto en _mapError() (que solo entiende errores de Supabase).
+    final incomingId = response.user?.id;
+    if (incomingId != null) {
+      final prefs = await SharedPreferences.getInstance();
+      final lastId = prefs.getString(_kLastUserId);
+      if (lastId != null && lastId != incomingId) {
+        // Cuenta diferente detectada — limpiar datos locales del negocio anterior.
+        await _clearLocalDatabase();
+      }
+      await prefs.setString(_kLastUserId, incomingId);
     }
   }
 
@@ -142,6 +183,14 @@ class AuthNotifier extends StateNotifier<User?> {
   }
 
   Future<void> signOut() async {
+    // Fix #1: guardar el user_id actual antes de cerrar sesión.
+    // Al próximo inicio de sesión, se comparará con el nuevo user_id
+    // para detectar un cambio de cuenta en el mismo dispositivo.
+    final currentId = Supabase.instance.client.auth.currentUser?.id;
+    if (currentId != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kLastUserId, currentId);
+    }
     await Supabase.instance.client.auth.signOut();
   }
 

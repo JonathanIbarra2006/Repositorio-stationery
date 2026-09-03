@@ -491,6 +491,8 @@ class _MovimientosTab extends ConsumerWidget {
           itemBuilder: (context, index) {
             final t = list[index];
             final isIngreso = t.tipo == TransactionType.ingreso;
+            final tieneCarrito = t.categoria == 'Ventas de Contado' && t.productosJson != null;
+
             return Container(
               margin: const EdgeInsets.only(bottom: 12), 
               padding: const EdgeInsets.all(16), 
@@ -515,14 +517,72 @@ class _MovimientosTab extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start, 
                       children: [
                         Text(t.descripcion, style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 14)), 
-                        Text(DateFormat('dd/MM/yyyy HH:mm').format(t.fecha), style: TextStyle(color: subColor, fontSize: 12))
+                        Text(DateFormat('dd/MM/yyyy HH:mm').format(t.fecha), style: TextStyle(color: subColor, fontSize: 12)),
+                        Text(t.categoria, style: TextStyle(color: subColor, fontSize: 11)),
                       ]
                     )
                   ), 
-                  Text(
-                    '${isIngreso ? '' : '- '}${currency.format(t.monto)}', 
-                    style: TextStyle(fontWeight: FontWeight.w900, color: isIngreso ? kSuccess : kError, fontSize: 16)
-                  )
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${isIngreso ? '' : '- '}${currency.format(t.monto)}', 
+                        style: TextStyle(fontWeight: FontWeight.w900, color: isIngreso ? kSuccess : kError, fontSize: 15)
+                      ),
+                      const SizedBox(height: 4),
+                      // Fix #7: botón de eliminar con confirmación y aviso de reposición de stock
+                      GestureDetector(
+                        onTap: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          final confirmar = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              title: const Text('Eliminar movimiento', style: TextStyle(fontWeight: FontWeight.bold)),
+                              content: Text(
+                                tieneCarrito
+                                    ? '¿Eliminar esta venta?\n\nSe repondrá automáticamente el stock de los productos vendidos.'
+                                    : '¿Estás seguro de eliminar este movimiento? Esta acción no se puede deshacer.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Cancelar'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('Eliminar', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirmar == true) {
+                            final error = await ref.read(transactionsProvider.notifier).deleteTransaction(t.id);
+                            if (error != null) {
+                              messenger.showSnackBar(
+                                SnackBar(content: Text(error), backgroundColor: Colors.red),
+                              );
+                            } else if (tieneCarrito) {
+                              messenger.showSnackBar(
+                                const SnackBar(
+                                  content: Text('Venta eliminada — stock repuesto automáticamente.'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
+                        ),
+                      ),
+                    ],
+                  ),
                 ]
               )
             );
@@ -532,6 +592,7 @@ class _MovimientosTab extends ConsumerWidget {
     );
   }
 }
+
 
 class _InventarioTab extends ConsumerWidget {
   final NumberFormat currency;

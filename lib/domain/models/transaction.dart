@@ -8,6 +8,9 @@ class AppTransaction {
   final String categoria; // Obligatorio (NOT NULL en SQLite)
   final String descripcion;
   final String? clienteId; // Opcional: para saber qué cliente realizó la compra
+  /// Fix #7: JSON del carrito de venta. Permite reponer stock si se elimina la transacción.
+  /// Formato: '[{"productoId":"...","nombre":"...","cantidad":2,"precio":1000}]'
+  final String? productosJson;
 
   AppTransaction({
     required this.id,
@@ -17,6 +20,7 @@ class AppTransaction {
     required this.categoria,
     required this.descripcion,
     this.clienteId,
+    this.productosJson,
   });
 
   Map<String, dynamic> toMap() {
@@ -29,6 +33,7 @@ class AppTransaction {
       'descripcion': descripcion,
       'cliente_id': clienteId,
       'updated_at': DateTime.now().toIso8601String(),
+      'productos_json': productosJson,
     };
   }
 
@@ -41,6 +46,7 @@ class AppTransaction {
       categoria: map['categoria'],
       descripcion: map['descripcion'],
       clienteId: map['cliente_id'],
+      productosJson: map['productos_json'] as String?,
     );
   }
 }

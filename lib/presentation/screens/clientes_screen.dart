@@ -389,9 +389,21 @@ class _ClienteTile extends ConsumerWidget {
                     ),
                   );
                   if (confirm == true) {
-                    await ref
-                        .read(clientesProvider.notifier)
-                        .eliminarClientePermanentemente(cliente.id);
+                    try {
+                      await ref
+                          .read(clientesProvider.notifier)
+                          .eliminarClientePermanentemente(cliente.id);
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(e.toString().replaceFirst('Exception: ', '')),
+                            backgroundColor: Colors.red.shade700,
+                            duration: const Duration(seconds: 5),
+                          ),
+                        );
+                      }
+                    }
                   }
                 }
               },

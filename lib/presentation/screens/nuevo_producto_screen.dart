@@ -185,8 +185,29 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
                       suffix: IconButton(
                         icon: const Icon(Icons.camera_alt_outlined, color: kAccent),
                         onPressed: () async {
+                          // Capturar messenger antes del await (evita use_build_context_synchronously)
+                          final messenger = ScaffoldMessenger.of(context);
                           final res = await Navigator.push(context, MaterialPageRoute(builder: (_) => const ScannerScreen()));
-                          if (res != null) setState(() => _codigoCtrl.text = res);
+                          if (res != null) {
+                            // Fix #8: sanear valor escaneado — los mismos filtros que la
+                            // entrada manual (solo dígitos, máximo 13 caracteres).
+                            // Un Code-128 o QR de texto contendría letras y debe rechazarse.
+                            final sanitized = res.toString().replaceAll(RegExp(r'[^0-9]'), '');
+                            if (sanitized.isEmpty) {
+                              messenger.showSnackBar(
+                                const SnackBar(
+                                  content: Text('El código escaneado no es un EAN-13 numérico válido.'),
+                                  backgroundColor: Colors.orange,
+                                ),
+                              );
+                              return;
+                            }
+                            if (mounted) {
+                              setState(() => _codigoCtrl.text = sanitized.length > 13
+                                  ? sanitized.substring(0, 13)
+                                  : sanitized);
+                            }
+                          }
                         },
                       ),
                     ),

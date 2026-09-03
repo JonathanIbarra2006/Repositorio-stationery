@@ -32,6 +32,9 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // Fix #2: regla necesaria para que SQLCipher funcione en release mode
+            // (evita que R8/ProGuard ofusque las clases nativas de net.sqlcipher).
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }

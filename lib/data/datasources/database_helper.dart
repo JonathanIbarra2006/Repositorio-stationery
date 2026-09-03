@@ -1,5 +1,13 @@
-import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_sqlcipher/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:uuid/uuid.dart';
+
+/// Fix #2: clave de cifrado AES-256 para la base de datos local.
+/// Se genera una vez por instalación y se persiste de forma segura en
+/// Keychain (iOS) o EncryptedSharedPreferences/Keystore (Android)
+/// mediante flutter_secure_storage.
+const _kDbKeyName = 'klip_db_encryption_key';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -13,15 +21,75 @@ class DatabaseHelper {
     return _database!;
   }
 
+  /// Obtiene (o genera la primera vez) la clave de cifrado de la BD.
+  Future<String> _getOrCreateEncryptionKey() async {
+    const storage = FlutterSecureStorage(
+      aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    );
+    String? key = await storage.read(key: _kDbKeyName);
+    if (key == null) {
+      // Primera instalación: generar una clave UUID única para este dispositivo.
+      key = const Uuid().v4();
+      await storage.write(key: _kDbKeyName, value: key);
+    }
+    return key;
+  }
+
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
+    final password = await _getOrCreateEncryptionKey();
+
+    // ── Intento 1: abrir con la clave guardada (caso normal) ─────────────────
+    try {
+      return await openDatabase(
+        path,
+        password: password,
+        version: 12,
+        onCreate: _createDB,
+        onUpgrade: _upgradeDB,
+        onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
+      );
+    } catch (e) {
+      // Si no es open_failed, el error es otro (migración, etc.) → relanzar
+      if (!e.toString().contains('open_failed') &&
+          !e.toString().contains('SQLITE_NOTADB')) {
+        rethrow;
+      }
+    }
+
+    // ── Intento 2: la BD puede venir de una versión anterior sin cifrado ──────
+    // Si la app se instaló antes de agregar SQLCipher, el archivo .db existe
+    // pero no tiene contraseña. Intentamos abrirlo sin password.
+    try {
+      return await openDatabase(
+        path,
+        // Sin password: retrocompatibilidad con versiones no cifradas
+        version: 12,
+        onCreate: _createDB,
+        onUpgrade: _upgradeDB,
+        onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
+      );
+    } catch (_) {
+      // El archivo existe pero no es una BD SQLite válida → continuar al reset
+    }
+
+    // ── Intento 3: reset total ────────────────────────────────────────────────
+    // El archivo .db está corrupto o la clave es irrecuperable.
+    // Lo eliminamos y creamos una BD nueva limpia.
+    // El usuario perderá sus datos locales, pero la app vuelve a funcionar.
+    // Los datos en Supabase siguen intactos y se pueden volver a descargar.
+    try {
+      await deleteDatabase(path);
+    } catch (_) {}
 
     return await openDatabase(
       path,
-      version: 11,
+      password: password,
+      version: 12,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
+      onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
     );
   }
 
@@ -52,7 +120,8 @@ class DatabaseHelper {
         descripcion TEXT NOT NULL,
         categoria TEXT NOT NULL,
         cliente_id TEXT,
-        updated_at TEXT
+        updated_at TEXT,
+        productos_json TEXT
       )
     ''');
 
@@ -201,6 +270,13 @@ class DatabaseHelper {
         // ignore: avoid_print
         print('[DB migración v11] No se pudo crear índice único de cédula: $e');
       }
+    }
+    if (oldVersion < 12) {
+      // Fix #7: columna para guardar el detalle de productos/cantidades de ventas de contado.
+      // Permite reponer el stock si una venta se elimina desde el historial.
+      await db.execute(
+        'ALTER TABLE transacciones ADD COLUMN productos_json TEXT',
+      );
     }
   }
 

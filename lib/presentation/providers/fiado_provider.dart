@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/datasources/database_helper.dart';
 import '../../domain/models/transaction.dart';
-import 'dart:math';
+// 'dart:math' ya no es necesario — Fix #9: se eliminó el uso de Random() para IDs.
 import 'package:uuid/uuid.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -171,8 +171,25 @@ class ClientesNotifier extends StateNotifier<AsyncValue<List<Cliente>>> {
     await loadClientes();
   }
 
+  /// Elimina permanentemente un cliente solo si NO tiene deuda pendiente.
+  /// Si el saldo es mayor a 0 lanza una excepción descriptiva para que el UI
+  /// la muestre al usuario en lugar de borrar silenciosamente un deudor.
   Future<void> eliminarClientePermanentemente(String id) async {
+    // Fix #5: verificar deuda pendiente antes de borrar.
     final db = await DatabaseHelper.instance.database;
+    final deudaResult = await db.rawQuery(
+      'SELECT SUM(total - monto_pagado) as saldo FROM fiados WHERE cliente_id = ? AND estado != ?',
+      [id, 'saldado'],
+    );
+    final deuda = deudaResult.isNotEmpty && deudaResult.first['saldo'] != null
+        ? (deudaResult.first['saldo'] as num).toDouble()
+        : 0.0;
+    if (deuda > 0) {
+      throw Exception(
+        'Este cliente tiene una deuda pendiente de \$${deuda.toStringAsFixed(0)}. '
+        'Salda la deuda o desactívalo en vez de eliminarlo.',
+      );
+    }
     await db.delete('clientes', where: 'id = ?', whereArgs: [id]);
     await loadClientes();
   }
@@ -189,8 +206,9 @@ class ClientesNotifier extends StateNotifier<AsyncValue<List<Cliente>>> {
       }
     }
 
-    final randomStr = Random().nextInt(99999999).toString().padLeft(8, '0');
-    final customId = 'CLI-$randomStr';
+    // Fix #9: usar UUID v4 para consistencia con el resto del proyecto
+    // y eliminar riesgo de colisión del espacio de solo 100M valores de Random().
+    final customId = 'CLI-${const Uuid().v4()}';
     
     await db.insert('clientes', {
       'id': customId,

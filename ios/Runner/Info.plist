@@ -4,6 +4,11 @@
 	<dict>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true/>
+		<!-- Fix #4: NSCameraUsageDescription es OBLIGATORIO en iOS.
+		     Sin esta clave, el sistema termina la app al intentar acceder a la cámara
+		     y Apple rechaza la app en App Store Review. -->
+		<key>NSCameraUsageDescription</key>
+		<string>Klip necesita acceder a la cámara para escanear los códigos de barras de tus productos.</string>
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleDisplayName</key>

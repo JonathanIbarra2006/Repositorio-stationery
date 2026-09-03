@@ -519,30 +519,69 @@ class _SyncCard extends StatelessWidget {
                       return _TableChip(table: e.key, count: e.value);
                     }).toList(),
                   ),
-                  if (hasWarnings) ...[
-                    const SizedBox(height: 12),
-                    ...result!.warnings.map(
-                      (w) => Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.warning_amber_rounded,
-                              size: 14,
-                              color: AppColors.warning,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                w,
+                  if (hasWarnings) ...[ 
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.07),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.warning.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.info_outline_rounded,
+                                size: 14,
+                                color: AppColors.warning,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${result!.warnings.length} sección${result!.warnings.length > 1 ? 'es' : ''} con incidencias',
                                 style: const TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
                                   color: AppColors.warning,
                                 ),
                               ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          ...result!.warnings.map(
+                            (w) => Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 2),
+                                    child: Icon(
+                                      Icons.circle,
+                                      size: 5,
+                                      color: AppColors.warning,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      w,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.warning.withValues(alpha: 0.9),
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
