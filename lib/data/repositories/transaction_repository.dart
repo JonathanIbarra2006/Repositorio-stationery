@@ -36,7 +36,11 @@ class TransactionRepository {
     return List.generate(maps.length, (i) => AppTransaction.fromMap(maps[i]));
   }
 
-  Future<void> registrarVentaContado(List<Map<String, dynamic>> carrito, double totalVenta) async {
+  Future<void> registrarVentaContado(
+    List<Map<String, dynamic>> carrito,
+    double totalVenta, {
+    String? descripcion,
+  }) async {
     final db = await dbHelper.database;
     await db.transaction((txn) async {
       final now = DateTime.now().toIso8601String();
@@ -74,7 +78,7 @@ class TransactionRepository {
         monto: totalVenta,
         fecha: DateTime.now(),
         categoria: 'Ventas de Contado',
-        descripcion: 'Venta rápida en mostrador',
+        descripcion: descripcion ?? 'Venta rápida en mostrador',
       );
       await txn.insert('transacciones', ingreso.toMap());
     });

@@ -42,8 +42,28 @@ class ProductRepository {
 
     // Validación: No permitir códigos de barra duplicados si existen
     if (product.codigoBarras != null && product.codigoBarras!.isNotEmpty) {
-      final duplicado = await db.query('productos', where: 'codigo_barras = ?', whereArgs: [product.codigoBarras]);
-      if (duplicado.isNotEmpty) throw DuplicateBarcodeException(product.codigoBarras!);
+      // Primero revisamos si existe un producto ACTIVO con ese código
+      final duplicadoActivo = await db.query(
+        'productos',
+        where: 'codigo_barras = ? AND is_active = 1',
+        whereArgs: [product.codigoBarras],
+      );
+      if (duplicadoActivo.isNotEmpty) {
+        throw DuplicateBarcodeException(product.codigoBarras!);
+      }
+
+      // Si no hay activo, verificamos si existe uno ARCHIVADO (informativo)
+      final duplicadoArchivado = await db.query(
+        'productos',
+        where: 'codigo_barras = ? AND is_active = 0',
+        whereArgs: [product.codigoBarras],
+      );
+      if (duplicadoArchivado.isNotEmpty) {
+        throw Exception(
+          'El código "${product.codigoBarras}" pertenece a un producto archivado. '
+          'Reactívalo o usa un código diferente.',
+        );
+      }
     }
 
     await db.insert('productos', product.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);

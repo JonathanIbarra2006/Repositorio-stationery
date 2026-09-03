@@ -739,9 +739,13 @@ class _VentaDeContadoScreenState
               })
           .toList();
 
+      final descripcionVenta =
+          _carrito.entries.map((e) => '${e.value}x ${e.key.nombre}').join(', ');
+
       await ref
           .read(transactionRepoProvider)
-          .registrarVentaContado(carritoItems, _totalVenta);
+          .registrarVentaContado(carritoItems, _totalVenta,
+              descripcion: descripcionVenta);
 
       // Refrescar providers para actualizar la interfaz
       ref.invalidate(productsProvider);

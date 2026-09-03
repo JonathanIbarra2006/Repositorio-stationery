@@ -178,6 +178,10 @@ class _NuevoProductoScreenState extends ConsumerState<NuevoProductoScreen> {
                       label: 'Código de Barras (EAN-13)',
                       icon: Icons.qr_code_scanner_rounded,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(13),
+                      ],
                       suffix: IconButton(
                         icon: const Icon(Icons.camera_alt_outlined, color: kAccent),
                         onPressed: () async {

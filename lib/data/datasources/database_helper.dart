@@ -187,11 +187,20 @@ class DatabaseHelper {
       }
     }
     if (oldVersion < 11) {
-      await db.execute('''
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_cedula 
-        ON clientes(cedula) 
-        WHERE cedula IS NOT NULL AND cedula != ''
-      ''');
+      // Protegemos con try/catch: si ya existen cédulas duplicadas de versiones
+      // anteriores, el CREATE UNIQUE INDEX fallaría. En ese caso registramos el
+      // error sin tumbar la apertura de la BD; la validación por código queda
+      // activa en la capa de aplicación (fiado_provider.dart).
+      try {
+        await db.execute('''
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_cedula 
+          ON clientes(cedula) 
+          WHERE cedula IS NOT NULL AND cedula != ''
+        ''');
+      } catch (e) {
+        // ignore: avoid_print
+        print('[DB migración v11] No se pudo crear índice único de cédula: $e');
+      }
     }
   }
 
