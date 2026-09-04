@@ -337,6 +337,7 @@ class _ResumenTab extends ConsumerWidget {
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 40),
+          physics: const BouncingScrollPhysics(),
           children: [
             const SizedBox(height: 10),
             Text('Distribución por Categoría', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
@@ -487,6 +488,7 @@ class _MovimientosTab extends ConsumerWidget {
         list.sort((a, b) => b.fecha.compareTo(a.fecha));
         return ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 40),
+          physics: const BouncingScrollPhysics(),
           itemCount: list.length,
           itemBuilder: (context, index) {
             final t = list[index];
@@ -609,6 +611,7 @@ class _InventarioTab extends ConsumerWidget {
         if (products.isEmpty) return const _EmptyTab(label: 'Sin productos');
         return ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 40),
+          physics: const BouncingScrollPhysics(),
           itemCount: products.length,
           itemBuilder: (context, index) {
             final p = products[index];
@@ -664,6 +667,7 @@ class _ClientesTab extends ConsumerWidget {
         if (activos.isEmpty) return const _EmptyTab(label: 'Sin clientes');
         return ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 40),
+          physics: const BouncingScrollPhysics(),
           itemCount: activos.length,
           itemBuilder: (context, index) {
             final c = activos[index];

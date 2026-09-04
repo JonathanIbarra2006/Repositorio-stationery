@@ -37,6 +37,7 @@ class _ClientesScreenState extends ConsumerState<ClientesScreen> {
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                physics: const BouncingScrollPhysics(),
                 children: [
                   // Tarjeta de resumen de clientes
                   clientesAsync.when(

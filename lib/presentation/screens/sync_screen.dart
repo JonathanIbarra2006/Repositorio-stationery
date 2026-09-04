@@ -6,6 +6,7 @@ import '../providers/product_provider.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/proveedor_provider.dart';
 import '../providers/fiado_provider.dart';
+import '../providers/date_range_provider.dart';
 
 class SyncScreen extends ConsumerStatefulWidget {
   const SyncScreen({super.key});
@@ -206,6 +207,10 @@ class _SyncScreenState extends ConsumerState<SyncScreen>
       if (mounted) {
         setState(() => _lastDownloadResult = result);
         
+        // Limpiar el filtro de fecha para que el historial completo sea visible
+        // Los datos descargados pueden ser de fechas anteriores al filtro activo
+        ref.read(dateRangeProvider.notifier).clearRange();
+
         // Actualizar los providers para que la interfaz se refresque en tiempo real
         ref.invalidate(productsProvider);
         ref.invalidate(transactionsProvider);

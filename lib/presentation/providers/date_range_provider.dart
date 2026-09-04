@@ -12,20 +12,23 @@ class DateRangeNotifier extends StateNotifier<DateRangeState> {
   DateRangeNotifier() : super(_getInitialState());
 
   static DateRangeState _getInitialState() {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    return DateRangeState(
-      range: DateTimeRange(start: today, end: today),
-      label: 'Hoy',
-    );
+    // Sin filtro de fecha al iniciar: se muestran TODAS las transacciones.
+    // El usuario puede acotar el rango desde el calendario en la pantalla de inicio.
+    return DateRangeState(range: null, label: 'Todo');
   }
 
   void setRange(DateTimeRange? range, String label) {
     state = DateRangeState(range: range, label: label);
   }
 
+  /// Limpia el filtro de fecha: muestra TODAS las transacciones sin restricción.
+  /// Se llama tras descargar datos de la nube para que el historial completo sea visible.
+  void clearRange() {
+    state = DateRangeState(range: null, label: 'Todo');
+  }
+
   void reset() {
-    state = DateRangeState(range: null, label: 'Hoy');
+    state = DateRangeState(range: null, label: 'Todo');
   }
 }
 
